@@ -23,20 +23,21 @@ as the Pi Agent extension.
    zot --ext /path/to/zot-planning-with-files
    ```
 
-2. Create a plan. The bundled skill can do it, or copy the templates:
+2. Install the upstream skill separately. The extension does not bundle it:
 
    ```bash
-   mkdir -p .planning/2026-01-10-my-task
-   cp skills/planning-with-files/templates/task_plan.md .planning/2026-01-10-my-task/
-   cp skills/planning-with-files/templates/findings.md .planning/2026-01-10-my-task/
-   cp skills/planning-with-files/templates/progress.md .planning/2026-01-10-my-task/
+   npx skills add OthmanAdi/planning-with-files --skill planning-with-files -g
    ```
 
-   Or invoke the skill in zot:
+   Then invoke it in zot:
 
    ```text
-   /skill:planning-with-files:planning-with-files
+   /skill:planning-with-files
    ```
+
+   If you prefer manual files, create `task_plan.md`, `findings.md`, and
+   `progress.md` in the project root or in `.planning/<slug>/` using the
+   upstream templates.
 
 3. Inspect the selected plan:
 
@@ -174,34 +175,39 @@ The extension also:
 - resets the auto-continue budget when the user submits a new prompt;
 - clears execution approval on session start and session end.
 
-## Skill bundle
+## Upstream skill
 
-The manifest declares `"skills": ["./skills"]`. zot discovers the bundled skill
-as `planning-with-files:planning-with-files` because extension-provided skills
-are namespaced. Invoke it with:
+The extension does not bundle the `planning-with-files` skill. Install it
+separately so the model has the three-file workflow instructions:
 
-```text
-/skill:planning-with-files:planning-with-files
+```bash
+npx skills add OthmanAdi/planning-with-files --skill planning-with-files -g
 ```
 
-The skill contains the workflow and the three templates under
-`skills/planning-with-files/templates/`.
+Invoke it in zot with:
+
+```text
+/skill:planning-with-files
+```
+
+The extension supplies the commands and lifecycle hooks. The skill supplies the
+workflow and templates.
 
 ## Project layout
 
 ```text
 extension.json                          zot manifest
-index.mjs                               protocol loop and registration
-lib/constants.mjs                       shared strings and limits
-lib/plan.mjs                            plan selection and status parsing
-lib/attestation.mjs                     SHA-256 attestation
-lib/runtime.mjs                         mode resolution and injection text
-lib/state.mjs                           per-session state
-lib/commands.mjs                        command handlers
-lib/hooks.mjs                           events and before_agent_start
-skills/planning-with-files/SKILL.md     bundled skill
-skills/planning-with-files/templates/   task_plan, findings, progress
-test/extension.test.mjs                 stdio protocol tests
+src/index.ts                            protocol loop and registration
+src/lib/types.ts                        shared protocol and plan types
+src/lib/constants.ts                    shared strings and limits
+src/lib/plan.ts                         plan selection and status parsing
+src/lib/attestation.ts                  SHA-256 attestation
+src/lib/runtime.ts                      mode resolution and injection text
+src/lib/state.ts                        per-session state
+src/lib/commands.ts                     command handlers
+src/lib/hooks.ts                        events and before_agent_start
+test/extension.test.ts                  stdio protocol tests
+tsconfig.json                           type-checking config
 ```
 
 ## Development
@@ -209,12 +215,21 @@ test/extension.test.mjs                 stdio protocol tests
 Requirements:
 
 - zot 0.4 or newer.
-- Node.js 20 or newer. No npm dependencies.
+- Node.js 23.6 or newer. Node runs the `.ts` sources directly through native
+  type stripping, so there is no build step. Dev dependencies are only for
+  type checking.
 
-Run the tests:
+Install the development dependencies:
+
+```bash
+npm install
+```
+
+Run the tests and the type checker:
 
 ```bash
 npm test
+npm run typecheck
 ```
 
 The suite drives the extension over its stdio protocol and covers command
@@ -231,7 +246,7 @@ Drive the extension by hand:
   printf '%s\n' '{"type":"command_invoked","id":"1","name":"plan-status","args":""}'
   sleep 0.2
   printf '%s\n' '{"type":"shutdown"}'
-} | node index.mjs
+} | node src/index.ts
 ```
 
 Set `PWF_DEBUG=1` to log injection and auto-continue decisions to stderr. zot
@@ -295,12 +310,12 @@ TUI for auto-continue and planning loops.
   loop therefore add real turns. The three-continue limit bounds the former;
   the loop interval bounds the latter.
 - The default loop prompt counts phases in `task_plan.md` directly instead of
-  running `scripts/check-complete.sh`, because this bundle does not vendor the
-  upstream shell scripts.
+  running `scripts/check-complete.sh`, because this extension does not vendor
+  the upstream shell scripts.
 
 ## License
 
 [MIT](https://opensource.org/licenses/MIT), Copyright (c) 2026 Ahmad Adi.
 
-The planning-with-files workflow and templates come from
+The planning-with-files workflow and command design come from
 [OthmanAdi/planning-with-files](https://github.com/OthmanAdi/planning-with-files).
