@@ -1,8 +1,8 @@
-node_modules/
+/node_modules/
 *.log
 .DS_Store
-.planning/
-task_plan.md
-findings.md
-progress.md
-.plan-attestation
+/.planning/
+/task_plan.md
+/findings.md
+/progress.md
+/.plan-attestation
