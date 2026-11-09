@@ -3,34 +3,34 @@ import {
   isPlanIncomplete,
   isSessionAttached,
   readPlanStatus,
-} from "./plan.ts";
-import { checkPlanAttestation } from "./attestation.ts";
+} from './plan.ts';
+import { checkPlanAttestation } from './attestation.ts';
 import {
   AUTO_CONTINUE_LIMIT,
   CACHE_SAFE_REMINDER,
   POST_WRITE_REMINDER,
-} from "./constants.ts";
-import { selectionErrorNotice } from "./commands.ts";
+} from './constants.ts';
+import { selectionErrorNotice } from './commands.ts';
 import {
   buildParityPlanInjection,
   buildTamperMessage,
   deriveEffectiveMode,
   resolveConfiguredMode,
   summarizePlan,
-} from "./runtime.ts";
+} from './runtime.ts';
 import {
   clearSessionApprovals,
   clearSessionAutoContinue,
   clearSessionLoop,
   isExecutionApproved,
   planSessionKey,
-} from "./state.ts";
+} from './state.ts';
 import type {
   EventFrame,
   InterceptFrame,
   ProtocolContext,
   RuntimeState,
-} from "./types.ts";
+} from './types.ts';
 
 const DANGEROUS_BASH_PATTERNS: RegExp[] = [
   /\brm\s+-[a-z]*r[a-z]*f\b/i,
@@ -44,70 +44,78 @@ const DANGEROUS_BASH_PATTERNS: RegExp[] = [
 ];
 
 function isDangerousBashCommand(command: string): boolean {
-  return DANGEROUS_BASH_PATTERNS.some((pattern) => pattern.test(command));
+  return DANGEROUS_BASH_PATTERNS.some(pattern => pattern.test(command));
 }
 
 function isToolUseStop(stop: string | undefined): boolean {
-  return /tool/i.test(stop || "");
+  return /tool/i.test(stop || '');
 }
 
 function isFailedTurn(frame: EventFrame): boolean {
-  const stop = (frame.stop || "").toLowerCase();
-  return Boolean(frame.error) || stop === "error" || stop === "aborted";
+  const stop = (frame.stop || '').toLowerCase();
+  return Boolean(frame.error) || stop === 'error' || stop === 'aborted';
 }
 
 function appendBlock(prompt: string, block: string): string {
-  if (prompt.length === 0) return block;
-  return `${prompt}\n\n${block}`;
+  return prompt.length === 0 ? block : `${prompt}\n\n${block}`;
 }
 
 function syncContext(
   frame: { cwd?: string; session_id?: string },
-  ctx: ProtocolContext,
+  context: ProtocolContext,
 ): void {
-  if (frame.cwd) ctx.state.cwd = frame.cwd;
-  if (frame.session_id) ctx.state.sessionId = frame.session_id;
+  if (frame.cwd) context.state.cwd = frame.cwd;
+  if (frame.session_id) context.state.sessionId = frame.session_id;
 }
 
-function debug(ctx: ProtocolContext, message: string): void {
-  if (process.env.PWF_DEBUG) ctx.log(message);
+function debug(context: ProtocolContext, message: string): void {
+  if (process.env.PWF_DEBUG) context.log(message);
 }
 
-export function handleEvent(frame: EventFrame, ctx: ProtocolContext): void {
-  syncContext(frame, ctx);
+export function handleEvent(frame: EventFrame, context: ProtocolContext): void {
+  syncContext(frame, context);
 
   switch (frame.event) {
-    case "session_start":
-      onSessionStart(ctx);
+    case 'session_start': {
+      onSessionStart(context);
       break;
-    case "session_end":
-      onSessionEnd(ctx);
+    }
+    case 'session_end': {
+      onSessionEnd(context);
       break;
-    case "user_prompt_submit":
-      onUserPromptSubmit(frame, ctx);
+    }
+    case 'user_prompt_submit': {
+      onUserPromptSubmit(frame, context);
       break;
-    case "turn_end":
-      onTurnEnd(frame, ctx);
+    }
+    case 'turn_end': {
+      onTurnEnd(frame, context);
       break;
-    case "tool_call":
-      onToolCall(frame, ctx);
+    }
+    case 'tool_call': {
+      onToolCall(frame, context);
       break;
-    case "tool_result":
-      onToolResult(frame, ctx);
+    }
+    case 'tool_result': {
+      onToolResult(frame, context);
       break;
-    case "pre_compact":
-      onPreCompact(ctx);
+    }
+    case 'pre_compact': {
+      onPreCompact(context);
       break;
-    case "post_compact":
-      onPostCompact(ctx);
+    }
+    case 'post_compact': {
+      onPostCompact();
       break;
-    default:
+    }
+    default: {
       break;
+    }
   }
 }
 
-function onSessionStart(ctx: ProtocolContext): void {
-  const state: RuntimeState = ctx.state;
+function onSessionStart(context: ProtocolContext): void {
+  const state: RuntimeState = context.state;
   clearSessionAutoContinue(state, state.sessionId);
   clearSessionApprovals(state, state.sessionId);
   clearSessionLoop(state, state.sessionId);
@@ -115,35 +123,35 @@ function onSessionStart(ctx: ProtocolContext): void {
   const status = readPlanStatus(state.cwd);
   const notice = selectionErrorNotice(status);
   if (notice) {
-    ctx.notify("warn", notice, true);
+    context.notify('warn', notice, true);
     return;
   }
   if (!status.exists) return;
   if (!isSessionAttached(status.cwd, state.sessionId)) {
-    ctx.notify(
-      "warn",
-      "[planning-with-files] session not attached to planning context",
+    context.notify(
+      'warn',
+      '[planning-with-files] session not attached to planning context',
       true,
     );
     return;
   }
-  ctx.notify(
-    "info",
+  context.notify(
+    'info',
     `${summarizePlan(status)} - run /plan-execute to activate hooks`,
     true,
   );
 }
 
-function onSessionEnd(ctx: ProtocolContext): void {
-  const state = ctx.state;
+function onSessionEnd(context: ProtocolContext): void {
+  const state = context.state;
   clearSessionAutoContinue(state, state.sessionId);
   clearSessionApprovals(state, state.sessionId);
   clearSessionLoop(state, state.sessionId);
 }
 
-function onUserPromptSubmit(frame: EventFrame, ctx: ProtocolContext): void {
-  const state = ctx.state;
-  const text = typeof frame.text === "string" ? frame.text : "";
+function onUserPromptSubmit(frame: EventFrame, context: ProtocolContext): void {
+  const state = context.state;
+  const text = typeof frame.text === 'string' ? frame.text : '';
 
   // Our own submit calls are not user input; do not reset the retry budget.
   const pending = state.extensionSubmits.get(text);
@@ -155,46 +163,48 @@ function onUserPromptSubmit(frame: EventFrame, ctx: ProtocolContext): void {
   clearSessionAutoContinue(state, state.sessionId);
 }
 
-function onTurnEnd(frame: EventFrame, ctx: ProtocolContext): void {
-  const state = ctx.state;
+function onTurnEnd(frame: EventFrame, context: ProtocolContext): void {
   // turn_end also fires for tool-use steps; only a terminal turn can continue.
   if (isToolUseStop(frame.stop)) return;
 
+  const state = context.state;
   const status = readPlanStatus(state.cwd);
   if (!status.exists) return;
 
   const sessionId = state.sessionId;
   const planKey = planSessionKey(sessionId, status);
 
-  if (status.closed) {
+  if (status.isClosed) {
     state.autoContinueBySessionPlan.set(planKey, 0);
     return;
   }
 
   if (isAllPhasesComplete(status)) {
     state.autoContinueBySessionPlan.set(planKey, 0);
-    ctx.notify(
-      "info",
+    context.notify(
+      'info',
       `[planning-with-files] ALL PHASES COMPLETE (${status.completePhases}/${status.totalPhases}).`,
     );
     return;
   }
 
-  if (isFailedTurn(frame)) return;
-  if (!isPlanIncomplete(status)) return;
+  if (isFailedTurn(frame) || !isPlanIncomplete(status)) return;
 
   if (!isExecutionApproved(state, sessionId, status)) {
-    ctx.notify(
-      "warn",
+    context.notify(
+      'warn',
       `[planning-with-files] Task incomplete (${status.completePhases}/${status.totalPhases}). Run /plan-execute to activate hooks.`,
     );
     return;
   }
 
-  const mode = deriveEffectiveMode(resolveConfiguredMode(status.cwd), state.host);
-  if (mode === "notify") {
-    ctx.notify(
-      "warn",
+  const mode = deriveEffectiveMode(
+    resolveConfiguredMode(status.cwd),
+    state.host,
+  );
+  if (mode === 'notify') {
+    context.notify(
+      'warn',
       `[planning-with-files] Task incomplete (${status.completePhases}/${status.totalPhases}). Continue manually.`,
     );
     return;
@@ -202,8 +212,8 @@ function onTurnEnd(frame: EventFrame, ctx: ProtocolContext): void {
 
   const current = state.autoContinueBySessionPlan.get(planKey) ?? 0;
   if (current >= AUTO_CONTINUE_LIMIT) {
-    ctx.notify(
-      "warn",
+    context.notify(
+      'warn',
       `[planning-with-files] Task incomplete (${status.completePhases}/${status.totalPhases}). Auto-continue limit reached.`,
     );
     return;
@@ -211,101 +221,117 @@ function onTurnEnd(frame: EventFrame, ctx: ProtocolContext): void {
 
   state.autoContinueBySessionPlan.set(planKey, current + 1);
   debug(
-    ctx,
+    context,
     `auto-continue ${current + 1}/${AUTO_CONTINUE_LIMIT} for ${sessionId} (${status.completePhases}/${status.totalPhases} phases)`,
   );
   const goal = state.goalBySession.get(sessionId);
   const message =
     `[planning-with-files] Task incomplete (${status.completePhases}/${status.totalPhases} phases done). ` +
-    "Update progress.md with what was done, then read task_plan.md and continue remaining phases." +
-    (goal ? ` Goal: ${goal}` : "");
+    'Update progress.md with what was done, then read task_plan.md and continue remaining phases.' +
+    (goal ? ` Goal: ${goal}` : '');
 
-  ctx.submit(message);
+  context.submit(message);
 }
 
-function onToolCall(frame: EventFrame, ctx: ProtocolContext): void {
-  const status = readPlanStatus(ctx.state.cwd);
-  const toolName = frame.tool_name || "";
+function onToolCall(frame: EventFrame, context: ProtocolContext): void {
+  const status = readPlanStatus(context.state.cwd);
+  const toolName = frame.tool_name || '';
 
-  if (!status.exists && !status.selectionError && (toolName === "write" || toolName === "edit")) {
-    ctx.notify(
-      "warn",
-      "[planning-with-files] No task_plan.md found. Create planning files first.",
+  if (
+    !status.exists &&
+    !status.selectionError &&
+    (toolName === 'write' || toolName === 'edit')
+  ) {
+    context.notify(
+      'warn',
+      '[planning-with-files] No task_plan.md found. Create planning files first.',
     );
   }
 
-  if (toolName === "bash") {
-    const args: Record<string, unknown> = frame.tool_args ?? {};
-    const command = typeof args.command === "string" ? args.command : "";
-    if (isDangerousBashCommand(command)) {
-      ctx.notify(
-        "warn",
-        "[planning-with-files] Dangerous command detected. Review current phase in task_plan.md before approval.",
-      );
-    }
+  if (toolName !== 'bash') return;
+
+  const toolArguments: Record<string, unknown> = frame.tool_args ?? {};
+  const command =
+    typeof toolArguments.command === 'string' ? toolArguments.command : '';
+  if (isDangerousBashCommand(command)) {
+    context.notify(
+      'warn',
+      '[planning-with-files] Dangerous command detected. Review current phase in task_plan.md before approval.',
+    );
   }
 }
 
-function onToolResult(frame: EventFrame, ctx: ProtocolContext): void {
-  if (frame.tool_name !== "write" && frame.tool_name !== "edit") return;
+function onToolResult(frame: EventFrame, context: ProtocolContext): void {
+  if (frame.tool_name !== 'write' && frame.tool_name !== 'edit') return;
 
-  const status = readPlanStatus(ctx.state.cwd);
-  if (!status.exists) return;
-  if (!isExecutionApproved(ctx.state, ctx.state.sessionId, status)) return;
+  const status = readPlanStatus(context.state.cwd);
+  if (
+    !status.exists ||
+    !isExecutionApproved(context.state, context.state.sessionId, status)
+  )
+    return;
 
-  ctx.notify("info", POST_WRITE_REMINDER);
+  context.notify('info', POST_WRITE_REMINDER);
 }
 
-function onPreCompact(ctx: ProtocolContext): void {
-  const status = readPlanStatus(ctx.state.cwd);
+function onPreCompact(context: ProtocolContext): void {
+  const status = readPlanStatus(context.state.cwd);
   if (!status.exists) return;
 
   const attestation = checkPlanAttestation(status);
   const reminder = [
-    "[planning-with-files] PreCompact: context compaction is about to occur.",
-    "Before compaction completes: ensure progress.md captures recent actions and task_plan.md status reflects current phase.",
+    '[planning-with-files] PreCompact: context compaction is about to occur.',
+    'Before compaction completes: ensure progress.md captures recent actions and task_plan.md status reflects current phase.',
     attestation.enabled && attestation.expected
       ? `Plan-SHA256 at compaction: ${attestation.expected}`
-      : "",
+      : '',
   ]
     .filter(Boolean)
-    .join("\n");
+    .join('\n');
 
-  ctx.notify("info", reminder);
+  context.notify('info', reminder);
 }
 
-function onPostCompact(_ctx: ProtocolContext): void {
+function onPostCompact(): void {
   // No delivery cache survives compaction, so there is nothing to clear here.
 }
 
 export function handleBeforeAgentStart(
   frame: InterceptFrame,
-  ctx: ProtocolContext,
-): string | null {
-  const state = ctx.state;
-  syncContext(frame, ctx);
+  context: ProtocolContext,
+): string | undefined {
+  const state = context.state;
+  syncContext(frame, context);
   if (frame.provider) state.host.provider = frame.provider;
   if (frame.model) state.host.model = frame.model;
 
   // A missing prompt means the host did not include one; never replace it.
-  if (typeof frame.system_prompt !== "string") return null;
+  if (typeof frame.system_prompt !== 'string') return undefined;
 
   const status = readPlanStatus(state.cwd);
   const notice = selectionErrorNotice(status);
   if (notice) return appendBlock(frame.system_prompt, notice);
-  if (!status.exists) return null;
-  if (!isSessionAttached(status.cwd, state.sessionId)) return null;
-  if (!isExecutionApproved(state, state.sessionId, status)) return null;
+  if (
+    !status.exists ||
+    !isSessionAttached(status.cwd, state.sessionId) ||
+    !isExecutionApproved(state, state.sessionId, status)
+  ) {
+    return undefined;
+  }
 
   const attestation = checkPlanAttestation(status);
   if (attestation.tampered) {
     return appendBlock(frame.system_prompt, buildTamperMessage(status));
   }
 
-  const mode = deriveEffectiveMode(resolveConfiguredMode(status.cwd), state.host);
-  if (mode === "notify") return null;
+  const mode = deriveEffectiveMode(
+    resolveConfiguredMode(status.cwd),
+    state.host,
+  );
+  if (mode === 'notify') return undefined;
 
-  debug(ctx, `injecting ${mode} plan context for ${status.planPath}`);
-  const block = mode === "parity" ? buildParityPlanInjection(status) : CACHE_SAFE_REMINDER;
+  debug(context, `injecting ${mode} plan context for ${status.planPath}`);
+  const block =
+    mode === 'parity' ? buildParityPlanInjection(status) : CACHE_SAFE_REMINDER;
   return appendBlock(frame.system_prompt, block);
 }

@@ -5,9 +5,9 @@ import {
   renameSync,
   unlinkSync,
   writeFileSync,
-} from "node:fs";
-import { dirname } from "node:path";
-import type { AttestationCheck, PlanStatus } from "./types.ts";
+} from 'node:fs';
+import path from 'node:path';
+import type { AttestationCheck, PlanStatus } from './types.ts';
 
 function normalizeHash(value: string): string | undefined {
   const hash = value.trim().toLowerCase();
@@ -16,7 +16,7 @@ function normalizeHash(value: string): string | undefined {
 
 function readExpectedHash(path: string): string | undefined {
   try {
-    return normalizeHash(readFileSync(path, "utf-8"));
+    return normalizeHash(readFileSync(path, 'utf8'));
   } catch {
     return undefined;
   }
@@ -52,14 +52,16 @@ export function checkPlanAttestation(status: PlanStatus): AttestationCheck {
 }
 
 export function writePlanAttestation(status: PlanStatus, hash: string): string {
-  const path = status.attestationCandidates[0];
-  if (!path) throw new Error("no attestation path for this plan");
+  const attestationPath = status.attestationCandidates[0];
+  if (!attestationPath) {
+    throw new Error('no attestation path for this plan');
+  }
 
-  mkdirSync(dirname(path), { recursive: true });
-  const tmp = `${path}.tmp.${process.pid}`;
-  writeFileSync(tmp, `${hash}\n`, "utf-8");
-  renameSync(tmp, path);
-  return path;
+  mkdirSync(path.dirname(attestationPath), { recursive: true });
+  const temporary = `${attestationPath}.tmp.${process.pid}`;
+  writeFileSync(temporary, `${hash}\n`, 'utf8');
+  renameSync(temporary, attestationPath);
+  return attestationPath;
 }
 
 export function clearPlanAttestation(status: PlanStatus): string[] {

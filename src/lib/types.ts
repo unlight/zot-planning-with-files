@@ -1,10 +1,8 @@
-export type HookMode = "auto" | "parity" | "cache-safe" | "notify";
-export type EffectiveMode = Exclude<HookMode, "auto">;
-export type PlanScope = "scoped" | "root" | "none";
+export type HookMode = 'auto' | 'parity' | 'cache-safe' | 'notify';
+export type EffectiveMode = Exclude<HookMode, 'auto'>;
+export type PlanScope = 'scoped' | 'root' | 'none';
 export type SelectionError =
-  | "session-plan-ambiguous"
-  | "invalid-plan-root"
-  | "plan-selector-rejected";
+  'session-plan-ambiguous' | 'invalid-plan-root' | 'plan-selector-rejected';
 
 export interface PlanPaths {
   cwd: string;
@@ -22,7 +20,7 @@ export interface PlanStatus extends PlanPaths {
   exists: boolean;
   planSha256?: string;
   attestationPath?: string;
-  closed: boolean;
+  isClosed: boolean;
   totalPhases: number;
   completePhases: number;
   inProgressPhases: number;
@@ -68,7 +66,7 @@ export interface Frame {
 }
 
 export interface HelloAckFrame extends Frame {
-  type: "hello_ack";
+  type: 'hello_ack';
   protocol_version?: number;
   zot_version?: string;
   provider?: string;
@@ -80,14 +78,14 @@ export interface HelloAckFrame extends Frame {
 }
 
 export interface CommandInvokedFrame extends Frame {
-  type: "command_invoked";
+  type: 'command_invoked';
   id: string;
   name: string;
   args?: string;
 }
 
 export interface EventFrame extends Frame {
-  type: "event";
+  type: 'event';
   event: string;
   session_id?: string;
   session_alias?: string;
@@ -111,7 +109,7 @@ export interface EventFrame extends Frame {
 }
 
 export interface InterceptFrame extends Frame {
-  type: "event_intercept";
+  type: 'event_intercept';
   id: string;
   event: string;
   system_prompt?: string;
@@ -127,10 +125,11 @@ export interface InterceptFrame extends Frame {
   text?: string;
 }
 
-export type NotifyLevel = "info" | "success" | "warn" | "error";
+export type NotifyLevel = 'info' | 'success' | 'warn' | 'error';
 
 export interface CommandResponse {
-  action: "prompt" | "tool_prompt" | "insert" | "display" | "open_panel" | "noop";
+  action:
+    'prompt' | 'tool_prompt' | 'insert' | 'display' | 'open_panel' | 'noop';
   display?: string;
   error?: string;
   prompt?: string;
@@ -141,6 +140,6 @@ export interface ProtocolContext {
   state: RuntimeState;
   send: (frame: Frame) => void;
   log: (message: string) => void;
-  notify: (level: NotifyLevel, message: string, startup?: boolean) => void;
+  notify: (level: NotifyLevel, message: string, isStartup?: boolean) => void;
   submit: (text: string) => void;
 }

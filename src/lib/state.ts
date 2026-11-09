@@ -1,17 +1,17 @@
-import type { PlanStatus, RuntimeState } from "./types.ts";
+import type { PlanStatus, RuntimeState } from './types.ts';
 
 export function createState(): RuntimeState {
   return {
     cwd: process.cwd(),
-    sessionId: "default",
+    sessionId: 'default',
     host: {
       protocolVersion: 0,
-      zotVersion: "",
-      provider: "",
-      model: "",
-      cwd: "",
-      extensionDir: "",
-      dataDir: "",
+      zotVersion: '',
+      provider: '',
+      model: '',
+      cwd: '',
+      extensionDir: '',
+      dataDir: '',
     },
     autoContinueBySessionPlan: new Map(),
     loopTimersBySession: new Map(),
@@ -22,7 +22,7 @@ export function createState(): RuntimeState {
 }
 
 export function planSessionKey(sessionId: string, status: PlanStatus): string {
-  return `${sessionId}:${status.planPath ?? "none"}`;
+  return `${sessionId}:${status.planPath ?? 'none'}`;
 }
 
 export function isExecutionApproved(
@@ -30,7 +30,9 @@ export function isExecutionApproved(
   sessionId: string,
   status: PlanStatus,
 ): boolean {
-  return state.executionApprovedBySessionPlan.has(planSessionKey(sessionId, status));
+  return state.executionApprovedBySessionPlan.has(
+    planSessionKey(sessionId, status),
+  );
 }
 
 export function approveExecution(
@@ -46,18 +48,28 @@ export function clearExecution(
   sessionId: string,
   status: PlanStatus,
 ): void {
-  state.executionApprovedBySessionPlan.delete(planSessionKey(sessionId, status));
+  state.executionApprovedBySessionPlan.delete(
+    planSessionKey(sessionId, status),
+  );
 }
 
-export function clearSessionApprovals(state: RuntimeState, sessionId: string): void {
-  for (const key of Array.from(state.executionApprovedBySessionPlan)) {
-    if (key.startsWith(`${sessionId}:`)) state.executionApprovedBySessionPlan.delete(key);
+export function clearSessionApprovals(
+  state: RuntimeState,
+  sessionId: string,
+): void {
+  for (const key of state.executionApprovedBySessionPlan) {
+    if (key.startsWith(`${sessionId}:`))
+      state.executionApprovedBySessionPlan.delete(key);
   }
 }
 
-export function clearSessionAutoContinue(state: RuntimeState, sessionId: string): void {
-  for (const key of Array.from(state.autoContinueBySessionPlan.keys())) {
-    if (key.startsWith(`${sessionId}:`)) state.autoContinueBySessionPlan.delete(key);
+export function clearSessionAutoContinue(
+  state: RuntimeState,
+  sessionId: string,
+): void {
+  for (const key of state.autoContinueBySessionPlan.keys()) {
+    if (key.startsWith(`${sessionId}:`))
+      state.autoContinueBySessionPlan.delete(key);
   }
 }
 
