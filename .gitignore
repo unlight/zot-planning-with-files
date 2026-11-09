@@ -6,3 +6,5 @@
 /findings.md
 /progress.md
 /.plan-attestation
+*.sublime-project
+*.sublime-workspace
