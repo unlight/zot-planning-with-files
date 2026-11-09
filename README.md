@@ -1,12 +1,10 @@
 # planning-with-files for zot
 
-A zot extension that ports the `planning-with-files` Pi Agent commands to
-zot's extension protocol. It keeps the same three-file workflow
-(`task_plan.md`, `findings.md`, `progress.md`) and the same command surface
-as the Pi Agent extension.
+A zot extension for the `planning-with-files` workflow. It keeps the
+three-file workflow (`task_plan.md`, `findings.md`, `progress.md`) on disk and
+adds plan status, attestation, execution approval, goal, and loop commands.
 
 - Upstream project: <https://github.com/OthmanAdi/planning-with-files>
-- Pi Agent guide: <https://github.com/OthmanAdi/planning-with-files/blob/master/docs/pi-agent.md>
 - zot extension protocol: <https://github.com/patriceckhart/zot/blob/main/docs/extensions.md>
 
 ## Quick start
@@ -82,13 +80,13 @@ injected into model context. Review and edit the plan before approving it.
 | `/plan-loop <interval> <prompt...>` | interval and prompt | Start a tick with a custom prompt.                                                                 |
 | `/plan-loop stop`                   | none                | Stop the session loop.                                                                             |
 
-The `/plan-*` names and argument forms match the Pi Agent extension documented
-in `docs/pi-agent.md`. `/pwf` and `/pwf-status` are host-style aliases.
+The `/plan-*` names and argument forms follow the upstream `planning-with-files`
+command set. `/pwf` and `/pwf-status` are host-style aliases.
 
 ### Why both `/plan-*` and `/pwf*`?
 
-`/plan-*` is the Pi Agent command surface. It contains operations that `/pwf*`
-does not cover: attestation, execution approval, goal, and loop.
+`/plan-*` is the full command surface. It contains operations that `/pwf*` does
+not cover: attestation, execution approval, goal, and loop.
 
 `/pwf` and `/pwf-status` are the shortcuts used by OpenCode, Hermes, and
 DeepSeek Harness. They are kept as aliases:
@@ -99,7 +97,7 @@ DeepSeek Harness. They are kept as aliases:
 
 Removing `/plan-*` would drop four operations or force inventing
 `/pwf-attest`, `/pwf-execute`, `/pwf-goal`, and `/pwf-loop`, which no upstream
-host defines. Keeping both preserves Pi compatibility and adds the familiar
+host defines. Keeping both preserves the full command set and adds the familiar
 shortcuts.
 
 ## Plan selection
@@ -153,9 +151,7 @@ Resolution order:
    }
    ```
 
-3. `<project>/.pi/settings.json` and `~/.pi/agent/settings.json` with the same
-   `planningWithFiles.mode` key, for Pi compatibility.
-4. Default: `auto`.
+3. Default: `auto`.
 
 ### Tamper protection
 
@@ -175,10 +171,9 @@ only while the saved digest remains trusted. It is not a keyed signature.
 
 ## Lifecycle behavior
 
-zot exposes fewer context-injection points than Pi. The port uses what zot
-provides:
+The extension uses the lifecycle events and interception points zot provides:
 
-| Pi behavior                            | zot implementation                                                                                               |
+| Behavior                               | zot implementation                                                                                               |
 | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
 | Session catchup on `session_start`     | Startup notification with the phase summary and the `/plan-execute` hint. No host session-store access.          |
 | Plan injection on `before_agent_start` | `before_agent_start` intercept appends to the complete system prompt.                                            |
@@ -350,14 +345,15 @@ TUI for auto-continue and planning loops.
 - External research belongs in `findings.md`. Treat web pages, APIs, and tool
   output as untrusted.
 
-## Differences from the Pi Agent extension
+## zot-specific behavior
 
-- zot has no extension status bar, so passive status is a startup notification.
-- zot has no non-triggering next-turn message, so pre-tool recitation is not
-  reproduced and post-write reminders are notifications.
-- zot's `submit` frame triggers a user prompt. Auto-continue and the planning
-  loop therefore add real turns. The three-continue limit bounds the former;
-  the loop interval bounds the latter.
+- Passive status is a startup notification because zot has no extension status
+  bar.
+- Pre-tool recitation is not available because zot has no non-triggering
+  next-turn message. Post-write reminders are notifications.
+- The `submit` frame triggers a user prompt. Auto-continue and the planning loop
+  therefore add real turns. The three-continue limit bounds the former; the
+  loop interval bounds the latter.
 - The default loop prompt counts phases in `task_plan.md` directly instead of
   running `scripts/check-complete.sh`, because this extension does not vendor
   the upstream shell scripts.

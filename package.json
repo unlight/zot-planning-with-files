@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "zot extension that ports the planning-with-files pi-agent commands",
+  "description": "zot extension for the planning-with-files workflow",
   "engines": {
     "node": ">=22.18"
   },
