@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   test:
-    name: 'Build and test (Node ${{ matrix.node-version }})'
+    name: 'Lint and test (Node ${{ matrix.node-version }})'
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
@@ -31,11 +31,52 @@ jobs:
       - name: 'Install Dependencies'
         run: npm ci
 
-      - name: 'Typecheck'
-        run: npm run typecheck
+      - name: 'Lint'
+        run: npm run lint
+
+      - name: 'Check formatting'
+        run: npm run format:check
 
       - name: 'Test'
         run: npm test
 
       - name: 'Check the committed bundle'
         run: git diff --exit-code -- dist/index.js
+
+  release:
+    name: 'Changelog, tag, release'
+    # needs: every matrix entry passed; the ref guard keeps pull requests out.
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    permissions:
+      # Overrides the read-only default: @semantic-release/git pushes the
+      # changelog commit and the tag, @semantic-release/github opens the release.
+      contents: write
+      issues: write
+      pull-requests: write
+    steps:
+      - name: 'Checkout Repository'
+        uses: actions/checkout@v6
+        with:
+          # semantic-release needs the full history and the existing tags.
+          fetch-depth: 0
+
+      - name: 'Setup Node'
+        uses: actions/setup-node@v6
+        with:
+          node-version: 26
+
+      - name: 'Install Dependencies'
+        run: npm ci
+
+      - name: 'Set git identity'
+        # @semantic-release/git runs a bare git commit; the runner has no identity.
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: 'Release'
+        run: npx semantic-release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
