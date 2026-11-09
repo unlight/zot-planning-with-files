@@ -4,7 +4,15 @@
   "private": true,
   "type": "module",
   "description": "zot extension that ports the planning-with-files pi-agent commands",
+  "engines": {
+    "node": ">=23.6"
+  },
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "typescript": "^5.9.3"
   }
 }
