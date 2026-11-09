@@ -2,6 +2,7 @@
 import { createInterface } from 'node:readline';
 import { stdin, stdout, stderr } from 'node:process';
 
+import extension from '../extension.json' with { type: 'json' };
 import { handleCommand } from './lib/commands.ts';
 import { handleBeforeAgentStart, handleEvent } from './lib/hooks.ts';
 import { createState } from './lib/state.ts';
@@ -15,8 +16,7 @@ import type {
   ProtocolContext,
 } from './lib/types.ts';
 
-const NAME = 'planning-with-files';
-const VERSION = '0.1.0';
+const { name: NAME, version: VERSION } = extension;
 
 const COMMANDS: Array<{ name: string; description: string }> = [
   {
