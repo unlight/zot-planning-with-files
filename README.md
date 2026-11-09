@@ -5,117 +5,155 @@ zot's extension protocol. It keeps the same three-file workflow
 (`task_plan.md`, `findings.md`, `progress.md`) and the same command surface
 as the Pi Agent extension.
 
-Upstream project: <https://github.com/OthmanAdi/planning-with-files>
+- Upstream project: <https://github.com/OthmanAdi/planning-with-files>
+- Pi Agent guide: <https://github.com/OthmanAdi/planning-with-files/blob/master/docs/pi-agent.md>
+- zot extension protocol: <https://github.com/patriceckhart/zot/blob/main/docs/extensions.md>
 
-## What it does
+## Quick start
 
-- Resolves the active plan from `PLAN_ID`, `PWF_PLAN_ROOT`, `.planning/.active_plan`,
-  the newest `.planning/<slug>/task_plan.md`, or the legacy root `task_plan.md`.
-- Registers the Pi Agent commands on zot: `/plan-status`, `/plan-attest`,
-  `/plan-execute`, `/plan-goal`, and `/plan-loop`.
-- Injects the approved plan into the system prompt when zot starts a run,
-  with tamper detection through a SHA-256 attestation.
-- Auto-continues an incomplete approved plan after a terminal model turn,
-  up to three times per session and plan.
-- Sends a post-write reminder after `write` or `edit`, a pre-compaction
-  reminder, and a warning for dangerous bash patterns.
-- Ships the `planning-with-files` skill and its three templates. The skill is
-  discovered as `planning-with-files:planning-with-files` because zot
-  namespaces extension-provided skills.
+1. Install the extension:
 
-## Requirements
+   ```bash
+   zot ext install /path/to/zot-planning-with-files
+   ```
 
-- zot 0.4 or newer.
-- Node.js 20 or newer. No npm dependencies.
+   Or load a working copy for one session:
 
-## Install
+   ```bash
+   zot --ext /path/to/zot-planning-with-files
+   ```
 
-From this directory:
+2. Create a plan. The bundled skill can do it, or copy the templates:
 
-```bash
-zot ext install .
-```
+   ```bash
+   mkdir -p .planning/2026-01-10-my-task
+   cp skills/planning-with-files/templates/task_plan.md .planning/2026-01-10-my-task/
+   cp skills/planning-with-files/templates/findings.md .planning/2026-01-10-my-task/
+   cp skills/planning-with-files/templates/progress.md .planning/2026-01-10-my-task/
+   ```
 
-Or load the working copy for one session:
+   Or invoke the skill in zot:
 
-```bash
-zot --ext /path/to/zot-planning-with-files
-```
+   ```text
+   /skill:planning-with-files:planning-with-files
+   ```
+
+3. Inspect the selected plan:
+
+   ```text
+   /plan-status
+   ```
+
+4. Lock the current plan bytes:
+
+   ```text
+   /plan-attest
+   ```
+
+5. Approve the plan and activate hooks for this session:
+
+   ```text
+   /plan-execute
+   ```
+
+The plan stays passive until `/plan-execute`. Passive means no plan text is
+injected into model context. Review and edit the plan before approving it.
 
 ## Commands
 
-```text
-/plan-status
-    Show the selected plan path, scope, phase counts, attestation state,
-    and whether execution hooks are active.
+| Command | Arguments | Behavior |
+|---|---|---|
+| `/plan-status` | none | Show the selected plan path, scope, plan ID, phase counts, attestation state, and execution state. |
+| `/plan-attest` | none | Record the SHA-256 of `task_plan.md` in `.planning/<id>/.attestation` or `./.plan-attestation`. |
+| `/plan-attest --show` | none | Print the stored hash, the current hash, and whether they match. |
+| `/plan-attest --clear` | none | Remove the attestation and reopen the plan for editing. |
+| `/plan-attest --target root` | none | Attest the legacy root `task_plan.md` explicitly. |
+| `/plan-attest --target <plan-id>` | plan ID | Attest one named plan explicitly. |
+| `/plan-execute` | none | Approve the selected plan for this session and activate hooks. Refuses a tampered plan. |
+| `/plan-execute reset` | none | Return the selected plan to passive review mode. |
+| `/plan-goal <text>` | goal text | Set the continuation goal appended to auto-continue prompts. |
+| `/plan-goal default` | none | Use `all phases in task_plan.md report Status: complete`. |
+| `/plan-goal clear` | none | Clear the session goal. |
+| `/plan-loop` | none | Start the default 10 minute planning tick. |
+| `/plan-loop <interval>` | `^\d+[smhd]$` | Start a tick with a custom interval, for example `5m` or `1h`. |
+| `/plan-loop <interval> <prompt...>` | interval and prompt | Start a tick with a custom prompt. |
+| `/plan-loop stop` | none | Stop the session loop. |
 
-/plan-attest
-    Record the current task_plan.md SHA-256 in .planning/<id>/.attestation
-    or ./.plan-attestation. Variants:
-      /plan-attest --show
-      /plan-attest --clear
-      /plan-attest --target root
-      /plan-attest --target <plan-id>
+The command names and argument forms match the Pi Agent extension documented in
+`docs/pi-agent.md`.
 
-/plan-execute
-    Approve the selected plan for this session and activate hooks.
-    Refuses to approve a tampered plan.
-      /plan-execute reset
+## Plan selection
 
-/plan-goal <text|default|clear>
-    Set or clear the continuation goal appended to auto-continue prompts.
-    "default" uses "all phases in task_plan.md report Status: complete".
-
-/plan-loop [10m] [prompt...]
-    Submit a planning tick on an interval. The first argument matching
-    ^\d+[smhd]$ is the interval; the rest is the tick prompt.
-      /plan-loop stop
-```
-
-## Plan resolution
-
-The extension reads `hello_ack.cwd` from zot and walks up to the nearest
-directory with `.planning/` or `task_plan.md`. The walk stops at `.git` or the
-filesystem root.
+The extension starts from `hello_ack.cwd` and walks up to the nearest directory
+with `.planning/` or `task_plan.md`. The walk stops at `.git` or the filesystem
+root.
 
 Selection order:
 
 1. `PWF_PLAN_ROOT`, when set. It must be an absolute existing directory. An
-   invalid pin is refused; the extension does not fall back.
-2. `PLAN_ID`, when set. It must name a contained `.planning/<slug>/task_plan.md`.
-   An invalid selector is refused; the extension does not fall back.
+   invalid pin is refused. The extension does not fall back to another plan.
+2. `PLAN_ID`, when set. It must name a contained
+   `.planning/<slug>/task_plan.md`. An invalid selector is refused. The
+   extension does not fall back to another plan.
 3. `.planning/.active_plan`.
-4. The newest `.planning/<slug>/task_plan.md` by plan mtime.
+4. The newest `.planning/<slug>/task_plan.md`, ranked by plan file mtime.
 5. The legacy project-root `task_plan.md`.
 
-If `.planning/sessions/` exists and more than one live plan is present, the
-extension refuses to pick one without `PLAN_ID`. A session counts as attached
-only when `.planning/sessions/<session_id>.attached` exists. This matches the
-upstream session-isolation behavior. zot does not create attachment markers
-itself, so create them explicitly when you use session isolation.
+When `.planning/sessions/` exists and more than one live plan is present, the
+extension refuses to choose one without `PLAN_ID`. A session counts as attached
+only when `.planning/sessions/<session_id>.attached` exists. zot does not create
+attachment markers itself. Create them explicitly when you use session
+isolation.
 
-## Modes
+## Context injection
 
-Mode resolution order:
+zot keeps the system prompt stable across normal user messages. The extension
+uses the `before_agent_start` intercept to append plan context when zot starts a
+run or rebuilds the prompt. The plan file on disk remains the source of truth.
 
-1. `PWF_MODE` environment variable: `auto`, `parity`, `cache-safe`, or `notify`.
+Modes:
+
+- `parity`: inject the first 50 plan lines, the attested hash when present, and
+  the last 20 normalized `progress.md` lines.
+- `cache-safe`: inject one stable reminder that points at the three planning
+  files. This is the default for DeepSeek providers and models.
+- `notify`: never inject plan text. Send notifications only.
+- `auto`: choose `cache-safe` for DeepSeek and `parity` for everything else.
+
+Resolution order:
+
+1. `PWF_MODE` environment variable.
 2. `<project>/.zot/planning-with-files.json`:
+
    ```json
-   { "planningWithFiles": { "mode": "auto" } }
+   {
+     "planningWithFiles": {
+       "mode": "auto"
+     }
+   }
    ```
+
 3. `<project>/.pi/settings.json` and `~/.pi/agent/settings.json` with the same
    `planningWithFiles.mode` key, for Pi compatibility.
 4. Default: `auto`.
 
-`auto` selects `cache-safe` for DeepSeek providers or models and `parity` for
-everything else.
+### Tamper protection
 
-- `parity`: inject the first 50 plan lines, the attested hash when present, and
-  the last 20 normalized `progress.md` lines.
-- `cache-safe`: inject one stable reminder that points at the three files.
-- `notify`: never inject plan text; only send notifications.
+`/plan-attest` records the current SHA-256 of `task_plan.md`. Every injection
+and `/plan-execute` compares the plan bytes against the recorded hash. On a
+mismatch, the extension replaces plan data with:
 
-## Lifecycle mapping
+```text
+[planning-with-files] [PLAN TAMPERED - injection blocked]
+expected=<hash>
+actual=<hash>
+Run /plan-attest to re-approve current contents, or restore the file from git.
+```
+
+The attestation is an ordinary local SHA-256 value. It detects a plan change
+only while the saved digest remains trusted. It is not a keyed signature.
+
+## Lifecycle behavior
 
 zot exposes fewer context-injection points than Pi. The port uses what zot
 provides:
@@ -124,23 +162,23 @@ provides:
 |---|---|
 | Session catchup on `session_start` | Startup notification with the phase summary and the `/plan-execute` hint. No host session-store access. |
 | Plan injection on `before_agent_start` | `before_agent_start` intercept appends to the complete system prompt. |
-| Pre-tool plan recitation | Not available without starting a turn, so the injected prompt and auto-continue tell the model to re-read the plan. |
+| Pre-tool plan recitation | Not available without starting a turn. The injected prompt and auto-continue tell the model to re-read the plan. |
 | Post-write reminder on `tool_result` | `notify` reminder after `write` or `edit`. zot cannot append text to a tool result. |
 | Auto-continue on `agent_end` | `turn_end` with a terminal stop reason, then `submit` with the continuation prompt, limit 3. |
 | Pre-compaction reminder | `pre_compact` notification, including the attested hash when present. |
 
-zot keeps the system prompt stable across normal user messages, so the injected
-plan text is a snapshot of the run start. The plan file on disk is the source of
-truth. The auto-continue prompt and the skill both instruct the model to read
-`task_plan.md` again.
+The extension also:
 
-`submit` is ignored in zot's print, JSON, and RPC modes. Auto-continue and
-`/plan-loop` therefore work only in the interactive TUI.
+- warns when `write` or `edit` runs without a `task_plan.md`;
+- warns on dangerous bash patterns before approval;
+- resets the auto-continue budget when the user submits a new prompt;
+- clears execution approval on session start and session end.
 
 ## Skill bundle
 
-The extension manifest declares `"skills": ["./skills"]`. zot discovers the
-bundled skill as `planning-with-files:planning-with-files`. Invoke it with:
+The manifest declares `"skills": ["./skills"]`. zot discovers the bundled skill
+as `planning-with-files:planning-with-files` because extension-provided skills
+are namespaced. Invoke it with:
 
 ```text
 /skill:planning-with-files:planning-with-files
@@ -149,32 +187,109 @@ bundled skill as `planning-with-files:planning-with-files`. Invoke it with:
 The skill contains the workflow and the three templates under
 `skills/planning-with-files/templates/`.
 
-## Testing
+## Project layout
+
+```text
+extension.json                          zot manifest
+index.mjs                               protocol loop and registration
+lib/constants.mjs                       shared strings and limits
+lib/plan.mjs                            plan selection and status parsing
+lib/attestation.mjs                     SHA-256 attestation
+lib/runtime.mjs                         mode resolution and injection text
+lib/state.mjs                           per-session state
+lib/commands.mjs                        command handlers
+lib/hooks.mjs                           events and before_agent_start
+skills/planning-with-files/SKILL.md     bundled skill
+skills/planning-with-files/templates/   task_plan, findings, progress
+test/extension.test.mjs                 stdio protocol tests
+```
+
+## Development
+
+Requirements:
+
+- zot 0.4 or newer.
+- Node.js 20 or newer. No npm dependencies.
+
+Run the tests:
 
 ```bash
 npm test
 ```
 
-The test suite drives the extension over its stdio protocol and covers command
+The suite drives the extension over its stdio protocol and covers command
 registration, plan status, attestation, approval, injection, tamper blocking,
 auto-continue limits, loop ticks, missing plans, selector rejection, invalid
 root pins, and DeepSeek cache-safe mode.
+
+Drive the extension by hand:
+
+```bash
+{
+  printf '%s\n' '{"type":"hello_ack","protocol_version":1,"zot_version":"test","provider":"anthropic","model":"claude","cwd":"/tmp/project","extension_dir":".","data_dir":"."}'
+  sleep 0.2
+  printf '%s\n' '{"type":"command_invoked","id":"1","name":"plan-status","args":""}'
+  sleep 0.2
+  printf '%s\n' '{"type":"shutdown"}'
+} | node index.mjs
+```
+
+Set `PWF_DEBUG=1` to log injection and auto-continue decisions to stderr. zot
+captures stderr to `$ZOT_HOME/logs/ext-planning-with-files.log`.
+
+## Troubleshooting
+
+**`No active plan (task_plan.md not found)`**
+
+Create `task_plan.md` in the project root or in `.planning/<slug>/`. Run
+`/plan-status` to see the path the extension resolved.
+
+**`Multiple plans are available while session isolation is armed`**
+
+Set `PLAN_ID=<slug>` for the session or remove `.planning/sessions/`. The
+extension will not choose a plan for you in this state.
+
+**`PLAN_ID did not resolve to a plan under .planning`**
+
+The selector is a binding. Check the slug and the `.planning/<slug>/task_plan.md`
+path. The extension does not fall back to another plan.
+
+**`PWF_PLAN_ROOT does not resolve to an existing absolute directory`**
+
+Set `PWF_PLAN_ROOT` to an absolute existing project root, or unset it.
+
+**`[PLAN TAMPERED - injection blocked]`**
+
+The plan changed after attestation. Run `/plan-attest` to approve the current
+bytes, or restore the file from git.
+
+**The plan is not injected**
+
+Check that `/plan-execute` was run in this session, that the mode is not
+`notify`, and that the session is attached when session isolation is armed.
+
+**Auto-continue or `/plan-loop` does nothing in print mode**
+
+zot ignores the `submit` frame outside the interactive TUI. Use the interactive
+TUI for auto-continue and planning loops.
 
 ## Security
 
 - Plan content is wrapped in `===BEGIN PLAN DATA===` and `===END PLAN DATA===`
   and should be treated as data, not instructions.
-- The attestation is an ordinary local SHA-256 value. It detects a plan change
-  only while the saved digest remains trusted. It is not a keyed signature.
+- Only the approved plan is injected. A tampered plan produces a tamper message
+  instead of plan data.
+- The attestation is a local hash, not a signature. A process that can replace
+  both the plan and the attestation can make new content pass.
 - The extension runs with the user's full filesystem permissions, like any zot
   extension.
-- Only the approved plan is injected. A tampered plan produces a
-  `[PLAN TAMPERED - injection blocked]` message instead of plan data.
+- External research belongs in `findings.md`. Treat web pages, APIs, and tool
+  output as untrusted.
 
 ## Differences from the Pi Agent extension
 
 - zot has no extension status bar, so passive status is a startup notification.
-- zot has no non-triggering "next turn" message, so pre-tool recitation is not
+- zot has no non-triggering next-turn message, so pre-tool recitation is not
   reproduced and post-write reminders are notifications.
 - zot's `submit` frame triggers a user prompt. Auto-continue and the planning
   loop therefore add real turns. The three-continue limit bounds the former;
