@@ -197,6 +197,8 @@ workflow and templates.
 
 ```text
 extension.json                          zot manifest
+dist/index.js                           committed build output
+tsdown.config.ts                        bundle config
 src/index.ts                            protocol loop and registration
 src/lib/types.ts                        shared protocol and plan types
 src/lib/constants.ts                    shared strings and limits
@@ -208,6 +210,7 @@ src/lib/commands.ts                     command handlers
 src/lib/hooks.ts                        events and before_agent_start
 test/extension.test.ts                  stdio protocol tests
 tsconfig.json                           type-checking config
+.github/workflows/ci.yml                build, typecheck, test, bundle check
 ```
 
 ## Development
@@ -215,9 +218,8 @@ tsconfig.json                           type-checking config
 Requirements:
 
 - zot 0.4 or newer.
-- Node.js 23.6 or newer. Node runs the `.ts` sources directly through native
-  type stripping, so there is no build step. Dev dependencies are only for
-  type checking.
+- Node.js 22.18 or newer. The test runner and `tsdown` use Node's native
+  TypeScript type stripping.
 
 Install the development dependencies:
 
@@ -225,12 +227,17 @@ Install the development dependencies:
 npm install
 ```
 
-Run the tests and the type checker:
+Build the bundle, run the tests, and run the type checker:
 
 ```bash
+npm run build
 npm test
 npm run typecheck
 ```
+
+`npm test` rebuilds `dist/index.js` before running the suite, matching the CI
+workflow. The built bundle is committed, and CI fails if the committed file
+differs from a fresh build.
 
 The suite drives the extension over its stdio protocol and covers command
 registration, plan status, attestation, approval, injection, tamper blocking,
@@ -246,7 +253,7 @@ Drive the extension by hand:
   printf '%s\n' '{"type":"command_invoked","id":"1","name":"plan-status","args":""}'
   sleep 0.2
   printf '%s\n' '{"type":"shutdown"}'
-} | node src/index.ts
+} | node dist/index.js
 ```
 
 Set `PWF_DEBUG=1` to log injection and auto-continue decisions to stderr. zot
