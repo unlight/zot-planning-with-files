@@ -36,7 +36,6 @@ export default {
           'extension.json',
           'package.json',
           'package-lock.json',
-          'src/index.ts',
           'dist/index.js',
         ],
       },
