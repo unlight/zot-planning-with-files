@@ -86,8 +86,18 @@ function log(message: string): void {
   }
 }
 
+const NOTIFICATION_PREFIX = '[planning-with-files] ';
+
 function notify(level: NotifyLevel, message: string, isStartup = false): void {
-  const frame: Frame = { type: 'notify', level, message };
+  // zot already labels extension notes; drop the internal duplicate prefix.
+  const text = message.startsWith(NOTIFICATION_PREFIX)
+    ? message.slice(NOTIFICATION_PREFIX.length)
+    : message;
+  const key = JSON.stringify([level, text, isStartup]);
+  if (state.lastNotification === key) return;
+  state.lastNotification = key;
+
+  const frame: Frame = { type: 'notify', level, message: text };
   if (isStartup) frame.startup = true;
   send(frame);
 }

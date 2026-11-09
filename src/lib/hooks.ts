@@ -107,7 +107,7 @@ export function handleEvent(frame: EventFrame, context: ProtocolContext): void {
       break;
     }
     case 'post_compact': {
-      onPostCompact();
+      onPostCompact(context);
       break;
     }
     default: {
@@ -118,6 +118,7 @@ export function handleEvent(frame: EventFrame, context: ProtocolContext): void {
 
 function onSessionStart(context: ProtocolContext): void {
   const state: RuntimeState = context.state;
+  state.lastNotification = undefined;
   clearSessionAutoContinue(state, state.sessionId);
   clearSessionApprovals(state, state.sessionId);
   clearSessionLoop(state, state.sessionId);
@@ -146,6 +147,7 @@ function onSessionStart(context: ProtocolContext): void {
 
 function onSessionEnd(context: ProtocolContext): void {
   const state = context.state;
+  state.lastNotification = undefined;
   clearSessionAutoContinue(state, state.sessionId);
   clearSessionApprovals(state, state.sessionId);
   clearSessionLoop(state, state.sessionId);
@@ -162,6 +164,7 @@ function onUserPromptSubmit(frame: EventFrame, context: ProtocolContext): void {
     else state.extensionSubmits.set(text, pending - 1);
     return;
   }
+  state.lastNotification = undefined;
   clearSessionAutoContinue(state, state.sessionId);
 }
 
@@ -294,8 +297,8 @@ function onPreCompact(context: ProtocolContext): void {
   context.notify('info', reminder);
 }
 
-function onPostCompact(): void {
-  // No delivery cache survives compaction, so there is nothing to clear here.
+function onPostCompact(context: ProtocolContext): void {
+  context.state.lastNotification = undefined;
 }
 
 export function handleBeforeAgentStart(

@@ -57,6 +57,7 @@ export interface RuntimeState {
   goalBySession: Map<string, string>;
   executionApprovedBySessionPlan: Set<string>;
   extensionSubmits: Map<string, number>;
+  lastNotification?: string;
 }
 
 export interface Frame {

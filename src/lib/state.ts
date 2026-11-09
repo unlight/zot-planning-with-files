@@ -18,6 +18,7 @@ export function createState(): RuntimeState {
     goalBySession: new Map(),
     executionApprovedBySessionPlan: new Set(),
     extensionSubmits: new Map(),
+    lastNotification: undefined,
   };
 }
 
