@@ -4,6 +4,15 @@ import { stderr, stdin, stdout } from "node:process";
 import { createHash } from "node:crypto";
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
+// extension.json
+var extension_default = {
+	name: "planning-with-files",
+	version: "0.1.0",
+	exec: "./dist/index.js",
+	language: "typescript",
+	description: "planning-with-files workflow for zot: plan status, attestation, execution approval, goal, and loop commands",
+	enabled: true
+};
 // src/lib/plan.ts
 const SLUG_RE = /^[A-Za-z0-9_][A-Za-z0-9._-]*$/;
 const ANCHOR_WALK_CAP = 10;
@@ -888,8 +897,7 @@ function handleBeforeAgentStart(frame, context) {
 	return appendBlock(frame.system_prompt, block);
 }
 // src/index.ts
-const NAME = "planning-with-files";
-const VERSION = "0.1.0";
+const { name: NAME, version: VERSION } = extension_default;
 const COMMANDS = [
 	{
 		name: "plan-status",
