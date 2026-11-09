@@ -351,6 +351,9 @@ TUI for auto-continue and planning loops.
 - The `submit` frame triggers a user prompt. Auto-continue and the planning loop
   therefore add real turns. The three-continue limit bounds the former; the
   loop interval bounds the latter.
+- Identical consecutive notifications are dropped until the next real user
+  prompt. zot adds the extension label itself, so notification text is sent
+  without the internal `[planning-with-files]` prefix.
 - The default loop prompt counts phases in `task_plan.md` directly instead of
   running `scripts/check-complete.sh`, because this extension does not vendor
   the upstream shell scripts.
