@@ -62,23 +62,23 @@ injected into model context. Review and edit the plan before approving it.
 
 ## Commands
 
-| Command | Arguments | Behavior |
-|---|---|---|
-| `/plan-status` | none | Show the selected plan path, scope, plan ID, phase counts, attestation state, and execution state. |
-| `/plan-attest` | none | Record the SHA-256 of `task_plan.md` in `.planning/<id>/.attestation` or `./.plan-attestation`. |
-| `/plan-attest --show` | none | Print the stored hash, the current hash, and whether they match. |
-| `/plan-attest --clear` | none | Remove the attestation and reopen the plan for editing. |
-| `/plan-attest --target root` | none | Attest the legacy root `task_plan.md` explicitly. |
-| `/plan-attest --target <plan-id>` | plan ID | Attest one named plan explicitly. |
-| `/plan-execute` | none | Approve the selected plan for this session and activate hooks. Refuses a tampered plan. |
-| `/plan-execute reset` | none | Return the selected plan to passive review mode. |
-| `/plan-goal <text>` | goal text | Set the continuation goal appended to auto-continue prompts. |
-| `/plan-goal default` | none | Use `all phases in task_plan.md report Status: complete`. |
-| `/plan-goal clear` | none | Clear the session goal. |
-| `/plan-loop` | none | Start the default 10 minute planning tick. |
-| `/plan-loop <interval>` | `^\d+[smhd]$` | Start a tick with a custom interval, for example `5m` or `1h`. |
-| `/plan-loop <interval> <prompt...>` | interval and prompt | Start a tick with a custom prompt. |
-| `/plan-loop stop` | none | Stop the session loop. |
+| Command                             | Arguments           | Behavior                                                                                           |
+| ----------------------------------- | ------------------- | -------------------------------------------------------------------------------------------------- |
+| `/plan-status`                      | none                | Show the selected plan path, scope, plan ID, phase counts, attestation state, and execution state. |
+| `/plan-attest`                      | none                | Record the SHA-256 of `task_plan.md` in `.planning/<id>/.attestation` or `./.plan-attestation`.    |
+| `/plan-attest --show`               | none                | Print the stored hash, the current hash, and whether they match.                                   |
+| `/plan-attest --clear`              | none                | Remove the attestation and reopen the plan for editing.                                            |
+| `/plan-attest --target root`        | none                | Attest the legacy root `task_plan.md` explicitly.                                                  |
+| `/plan-attest --target <plan-id>`   | plan ID             | Attest one named plan explicitly.                                                                  |
+| `/plan-execute`                     | none                | Approve the selected plan for this session and activate hooks. Refuses a tampered plan.            |
+| `/plan-execute reset`               | none                | Return the selected plan to passive review mode.                                                   |
+| `/plan-goal <text>`                 | goal text           | Set the continuation goal appended to auto-continue prompts.                                       |
+| `/plan-goal default`                | none                | Use `all phases in task_plan.md report Status: complete`.                                          |
+| `/plan-goal clear`                  | none                | Clear the session goal.                                                                            |
+| `/plan-loop`                        | none                | Start the default 10 minute planning tick.                                                         |
+| `/plan-loop <interval>`             | `^\d+[smhd]$`       | Start a tick with a custom interval, for example `5m` or `1h`.                                     |
+| `/plan-loop <interval> <prompt...>` | interval and prompt | Start a tick with a custom prompt.                                                                 |
+| `/plan-loop stop`                   | none                | Stop the session loop.                                                                             |
 
 The command names and argument forms match the Pi Agent extension documented in
 `docs/pi-agent.md`.
@@ -159,14 +159,14 @@ only while the saved digest remains trusted. It is not a keyed signature.
 zot exposes fewer context-injection points than Pi. The port uses what zot
 provides:
 
-| Pi behavior | zot implementation |
-|---|---|
-| Session catchup on `session_start` | Startup notification with the phase summary and the `/plan-execute` hint. No host session-store access. |
-| Plan injection on `before_agent_start` | `before_agent_start` intercept appends to the complete system prompt. |
-| Pre-tool plan recitation | Not available without starting a turn. The injected prompt and auto-continue tell the model to re-read the plan. |
-| Post-write reminder on `tool_result` | `notify` reminder after `write` or `edit`. zot cannot append text to a tool result. |
-| Auto-continue on `agent_end` | `turn_end` with a terminal stop reason, then `submit` with the continuation prompt, limit 3. |
-| Pre-compaction reminder | `pre_compact` notification, including the attested hash when present. |
+| Pi behavior                            | zot implementation                                                                                               |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Session catchup on `session_start`     | Startup notification with the phase summary and the `/plan-execute` hint. No host session-store access.          |
+| Plan injection on `before_agent_start` | `before_agent_start` intercept appends to the complete system prompt.                                            |
+| Pre-tool plan recitation               | Not available without starting a turn. The injected prompt and auto-continue tell the model to re-read the plan. |
+| Post-write reminder on `tool_result`   | `notify` reminder after `write` or `edit`. zot cannot append text to a tool result.                              |
+| Auto-continue on `agent_end`           | `turn_end` with a terminal stop reason, then `submit` with the continuation prompt, limit 3.                     |
+| Pre-compaction reminder                | `pre_compact` notification, including the attested hash when present.                                            |
 
 The extension also:
 
@@ -210,7 +210,7 @@ src/lib/commands.ts                     command handlers
 src/lib/hooks.ts                        events and before_agent_start
 test/extension.test.ts                  stdio protocol tests
 tsconfig.json                           type-checking config
-.github/workflows/ci.yml                build, typecheck, test, bundle check
+.github/workflows/ci.yml                lint, format, test, bundle check, release
 ```
 
 ## Development
@@ -227,17 +227,19 @@ Install the development dependencies:
 npm install
 ```
 
-Build the bundle, run the tests, and run the type checker:
+Build the bundle, lint, format, and test:
 
 ```bash
 npm run build
+npm run lint
+npm run format:check
 npm test
-npm run typecheck
 ```
 
-`npm test` rebuilds `dist/index.js` before running the suite, matching the CI
-workflow. The built bundle is committed, and CI fails if the committed file
-differs from a fresh build.
+`npm run lint` runs ESLint and `tsc --noEmit`. `npm run format` rewrites the
+workspace with Prettier; `npm run format:check` verifies it in CI. `npm test`
+rebuilds `dist/index.js` before running the suite. The built bundle is
+committed, and CI fails if the committed file differs from a fresh build.
 
 The suite drives the extension over its stdio protocol and covers command
 registration, plan status, attestation, approval, injection, tamper blocking,
@@ -258,6 +260,25 @@ Drive the extension by hand:
 
 Set `PWF_DEBUG=1` to log injection and auto-continue decisions to stderr. zot
 captures stderr to `$ZOT_HOME/logs/ext-planning-with-files.log`.
+
+## Release
+
+Pushing conventional commits to `master` runs `semantic-release` from the CI
+workflow. The release job:
+
+1. derives the next version from the commit history;
+2. runs `node src/sync-version.ts <version>` to update `extension.json`,
+   `package.json`, `package-lock.json`, and `VERSION` in `src/index.ts`;
+3. rebuilds `dist/index.js`;
+4. commits `CHANGELOG.md` and the versioned files;
+5. tags the release and publishes GitHub release notes.
+
+Run the version sync manually when preparing a release by hand:
+
+```bash
+node src/sync-version.ts 0.1.1
+npm run build
+```
 
 ## Troubleshooting
 
