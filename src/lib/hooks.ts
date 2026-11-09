@@ -1,3 +1,5 @@
+// Ported from the upstream planning-with-files extension runtime.ts.
+// zot-specific event mapping and injection behavior adapted from docs/extensions.md.
 import {
   isAllPhasesComplete,
   isPlanIncomplete,

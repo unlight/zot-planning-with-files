@@ -253,6 +253,12 @@ registration, plan status, attestation, approval, injection, tamper blocking,
 auto-continue limits, loop ticks, `/pwf` aliases, missing plans, selector
 rejection, invalid root pins, and DeepSeek cache-safe mode.
 
+### Provenance
+
+The lifecycle handlers in `src/lib/hooks.ts` are ported from the upstream
+`planning-with-files` extension runtime (`runtime.ts`). The zot event mapping
+and injection semantics follow zot's extension protocol.
+
 Drive the extension by hand:
 
 ```bash
