@@ -14,10 +14,9 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import type { Readable, Writable } from 'node:stream';
 
-const EXT_DIR = dirname(dirname(fileURLToPath(import.meta.url)));
+const EXT_DIR = dirname(dirname(import.meta.filename));
 
 const EXPECTED_COMMANDS = [
   'plan-status',
@@ -277,7 +276,7 @@ async function startExtension(
   };
 }
 
-test('registers the pi-agent command surface', async t => {
+test('registers the planning command surface', async t => {
   const project = createProject();
   t.after(() => rmSync(project, { recursive: true, force: true }));
   const session = await startExtension(project);
