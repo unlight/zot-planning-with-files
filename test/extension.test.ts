@@ -19,6 +19,16 @@ import type { Readable, Writable } from 'node:stream';
 
 const EXT_DIR = dirname(dirname(fileURLToPath(import.meta.url)));
 
+const EXPECTED_COMMANDS = [
+  'plan-status',
+  'plan-attest',
+  'plan-execute',
+  'plan-goal',
+  'plan-loop',
+  'pwf',
+  'pwf-status',
+];
+
 const PLAN = `# Task Plan: Test
 
 ## Goal
@@ -59,6 +69,9 @@ interface TestFrame {
   startup?: boolean;
   display?: string;
   action?: string;
+  prompt?: string;
+  tool_name?: string;
+  tool_args?: Record<string, unknown>;
   events?: string[];
   intercept?: string[];
   [key: string]: unknown;
@@ -200,7 +213,7 @@ async function startExtension(
   });
 
   const commands: TestFrame[] = [];
-  for (let index = 0; index < 5; index++) {
+  for (let index = 0; index < EXPECTED_COMMANDS.length; index++) {
     commands.push(
       await frames.next(frame => frame.type === 'register_command'),
     );
@@ -274,13 +287,10 @@ test('registers the pi-agent command surface', async t => {
   const commandNames = session.commands
     .map(entry => entry.name ?? '')
     .toSorted((a, b) => a.localeCompare(b));
-  assert.deepEqual(commandNames, [
-    'plan-attest',
-    'plan-execute',
-    'plan-goal',
-    'plan-loop',
-    'plan-status',
-  ]);
+  const expectedNames = [...EXPECTED_COMMANDS].toSorted((a, b) =>
+    a.localeCompare(b),
+  );
+  assert.deepEqual(commandNames, expectedNames);
   assert.ok((session.subscribe.events ?? []).includes('turn_end'));
   assert.ok((session.subscribe.events ?? []).includes('tool_result'));
   assert.deepEqual(session.subscribe.intercept ?? [], ['before_agent_start']);
@@ -292,6 +302,36 @@ test('registers the pi-agent command surface', async t => {
   assert.match(response.display ?? '', /In progress: 1/);
   assert.match(response.display ?? '', /Attestation: not recorded/);
   assert.match(response.display ?? '', /Execution: passive/);
+});
+
+test('pwf aliases start the workflow and show status', async t => {
+  const project = createProject();
+  t.after(() => rmSync(project, { recursive: true, force: true }));
+  const session = await startExtension(project);
+  t.after(() => session.close());
+
+  const started = await session.command('pwf', 'ship the feature');
+  assert.equal(started.action, 'tool_prompt');
+  assert.equal(started.tool_name, 'skill');
+  assert.deepEqual(started.tool_args, { name: 'planning-with-files' });
+  assert.equal(started.prompt, 'ship the feature');
+
+  const defaultStart = await session.command('pwf');
+  assert.match(
+    defaultStart.prompt ?? '',
+    /Start the planning-with-files workflow/,
+  );
+
+  const status = await session.command('pwf-status');
+  assert.equal(status.action, 'display');
+  assert.match(status.display ?? '', /Planning status/);
+  assert.match(status.display ?? '', /Current: Phase 1: One/);
+  assert.match(
+    status.display ?? '',
+    /Phases: 0\/2 complete, 1 in progress, 1 pending/,
+  );
+  assert.match(status.display ?? '', /Attestation: not recorded/);
+  assert.match(status.display ?? '', /Execution: passive/);
 });
 
 test('attestation lifecycle writes, verifies, and clears', async t => {
@@ -505,6 +545,9 @@ test('reports a missing plan and never injects one', async t => {
   );
   assert.equal(response.action, 'noop');
   assert.ok(warning);
+
+  const pwfStatus = await session.command('pwf-status');
+  assert.match(pwfStatus.display ?? '', /No planning files found/);
 
   session.send({
     type: 'event',
