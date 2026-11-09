@@ -361,6 +361,14 @@ function deriveEffectiveMode(mode, host) {
 	const model = (host.model || "").toLowerCase();
 	return provider.includes("deepseek") || model.includes("deepseek") ? "cache-safe" : "parity";
 }
+function selectionErrorNotice(status) {
+	switch (status.selectionError) {
+		case "session-plan-ambiguous": return SESSION_PLAN_AMBIGUOUS_NOTICE;
+		case "invalid-plan-root": return INVALID_PLAN_ROOT_NOTICE;
+		case "plan-selector-rejected": return PLAN_SELECTOR_REJECTED_NOTICE;
+		default: return "";
+	}
+}
 function summarizePlan(status) {
 	if (!status.exists) return "No active task_plan.md";
 	if (status.totalPhases <= 0) return "task_plan.md detected (no phase headers yet)";
@@ -438,15 +446,58 @@ function clearSessionLoop(state, sessionId) {
 	if (timer) clearInterval(timer);
 	state.loopTimersBySession.delete(sessionId);
 }
-// src/lib/commands.ts
-function selectionErrorNotice(status) {
-	switch (status.selectionError) {
-		case "session-plan-ambiguous": return SESSION_PLAN_AMBIGUOUS_NOTICE;
-		case "invalid-plan-root": return INVALID_PLAN_ROOT_NOTICE;
-		case "plan-selector-rejected": return PLAN_SELECTOR_REJECTED_NOTICE;
-		default: return "";
+// src/lib/pwf.ts
+function handlePwf(commandArguments) {
+	return {
+		action: "tool_prompt",
+		prompt: commandArguments.trim() || "Start the planning-with-files workflow for this project.",
+		tool_name: "skill",
+		tool_args: { name: "planning-with-files" }
+	};
+}
+function currentPhaseName(status) {
+	if (!status.planPath) return "none";
+	try {
+		const content = readFileSync(status.planPath, "utf8");
+		let heading = "";
+		for (const line of content.split("\n")) {
+			if (/^###\s+/.test(line)) heading = line.replace(/^###\s+/, "").trim();
+			if (/\*\*Status:\*\*\s*in_progress\b/i.test(line) || /\[in_progress\]/i.test(line)) return heading || "none";
+		}
+		return content.match(/^##\s+Current Phase\s*\n+([^\n#]+)/im)?.[1]?.trim() ?? "none";
+	} catch {
+		return "none";
 	}
 }
+function handlePwfStatus(context) {
+	const status = readPlanStatus(context.state.cwd);
+	const notice = selectionErrorNotice(status);
+	if (notice) {
+		context.notify("warn", notice);
+		return { action: "noop" };
+	}
+	if (!status.exists) return {
+		action: "display",
+		display: "No planning files found. Run /pwf to start a new planning session."
+	};
+	const attestation = checkPlanAttestation(status);
+	const mode = deriveEffectiveMode(resolveConfiguredMode(status.cwd), context.state.host);
+	const isApproved = isExecutionApproved(context.state, context.state.sessionId, status);
+	return {
+		action: "display",
+		display: [
+			"Planning status",
+			`Plan: ${status.planId ?? "root"} (${status.planPath})`,
+			`Scope: ${status.scope}`,
+			`Mode: ${mode}`,
+			`Attestation: ${attestation.enabled ? attestation.tampered ? "TAMPERED" : "valid" : "not recorded"}`,
+			`Execution: ${isApproved ? "active" : "passive (run /plan-execute)"}`,
+			`Current: ${currentPhaseName(status)}`,
+			`Phases: ${status.completePhases}/${status.totalPhases} complete, ${status.inProgressPhases} in progress, ${status.pendingPhases} pending`
+		].join("\n")
+	};
+}
+// src/lib/commands.ts
 function notifySelectionError(status, notify) {
 	const notice = selectionErrorNotice(status);
 	if (!notice) return "";
@@ -489,6 +540,8 @@ function handleCommand(name, commandArguments, context) {
 		case "plan-execute": return handlePlanExecute(commandArguments, context);
 		case "plan-goal": return handlePlanGoal(commandArguments, context);
 		case "plan-loop": return handlePlanLoop(commandArguments, context);
+		case "pwf": return handlePwf(commandArguments);
+		case "pwf-status": return handlePwfStatus(context);
 		default: return {
 			action: "noop",
 			error: `unknown command /${name}`
@@ -864,6 +917,14 @@ const COMMANDS = [
 	{
 		name: "plan-loop",
 		description: "start or stop planning-loop ticks (default 10m)"
+	},
+	{
+		name: "pwf",
+		description: "start the planning-with-files workflow"
+	},
+	{
+		name: "pwf-status",
+		description: "show a compact planning status"
 	}
 ];
 const EVENTS = [
