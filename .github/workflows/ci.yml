@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  - push
+  - pull_request
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: 'Build and test (Node ${{ matrix.node-version }})'
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        # 22.18 is the first release that strips TypeScript types by default.
+        node-version: ['22.18.0', '24', '26']
+    steps:
+      - name: 'Checkout Repository'
+        uses: actions/checkout@v6
+        with:
+          # Read-only job: keep GITHUB_TOKEN out of .git/config.
+          persist-credentials: false
+
+      - name: 'Setup Node'
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: 'Install Dependencies'
+        run: npm ci
+
+      - name: 'Typecheck'
+        run: npm run typecheck
+
+      - name: 'Test'
+        run: npm test
+
+      - name: 'Check the committed bundle'
+        run: git diff --exit-code -- dist/index.js
