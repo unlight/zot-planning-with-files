@@ -300,6 +300,7 @@ TUI for auto-continue and planning loops.
 
 ## License
 
-MIT. The planning-with-files workflow and templates come from
-<https://github.com/OthmanAdi/planning-with-files> (MIT, Copyright (c) 2026
-Ahmad Adi).
+[MIT](https://opensource.org/licenses/MIT), Copyright (c) 2026 Ahmad Adi.
+
+The planning-with-files workflow and templates come from
+[OthmanAdi/planning-with-files](https://github.com/OthmanAdi/planning-with-files).
