@@ -267,8 +267,8 @@ workflow. The release job:
 
 1. derives the next version from the commit history;
 2. runs `node src/sync-version.ts <version>` to update `extension.json`,
-   `package.json`, `package-lock.json`, and `VERSION` in `src/index.ts`;
-3. rebuilds `dist/index.js`;
+   `package.json`, and `package-lock.json`;
+3. rebuilds `dist/index.js`, which imports the manifest name and version;
 4. commits `CHANGELOG.md` and the versioned files;
 5. tags the release and publishes GitHub release notes.
 
