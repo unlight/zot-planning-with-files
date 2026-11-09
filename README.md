@@ -83,23 +83,6 @@ injected into model context. Review and edit the plan before approving it.
 The `/plan-*` names and argument forms follow the upstream `planning-with-files`
 command set. `/pwf` and `/pwf-status` are host-style aliases.
 
-### Why both `/plan-*` and `/pwf*`?
-
-`/plan-*` is the full command surface. It contains operations that `/pwf*` does
-not cover: attestation, execution approval, goal, and loop.
-
-`/pwf` and `/pwf-status` are the shortcuts used by OpenCode, Hermes, and
-DeepSeek Harness. They are kept as aliases:
-
-- `/pwf` loads the upstream `planning-with-files` skill through zot's
-  `tool_prompt` action and submits the optional task text.
-- `/pwf-status` prints the compact status block used by those hosts.
-
-Removing `/plan-*` would drop four operations or force inventing
-`/pwf-attest`, `/pwf-execute`, `/pwf-goal`, and `/pwf-loop`, which no upstream
-host defines. Keeping both preserves the full command set and adds the familiar
-shortcuts.
-
 ## Plan selection
 
 The extension starts from `hello_ack.cwd` and walks up to the nearest directory
