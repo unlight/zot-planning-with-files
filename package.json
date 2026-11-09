@@ -2,8 +2,24 @@
   "name": "zot-planning-with-files",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "description": "zot extension for the planning-with-files workflow",
+  "keywords": [
+    "zot",
+    "zot-extension",
+    "planning-with-files",
+    "task-plan",
+    "progress"
+  ],
+  "homepage": "https://github.com/unlight/zot-planning-with-files#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/unlight/zot-planning-with-files.git"
+  },
+  "bugs": {
+    "url": "https://github.com/unlight/zot-planning-with-files/issues"
+  },
   "engines": {
     "node": ">=22.18"
   },
