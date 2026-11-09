@@ -100,8 +100,9 @@ function createFrameQueue(child: TestChild): FrameQueue {
 
     const index = waiters.findIndex((waiter) => waiter.predicate(frame));
     if (index >= 0) {
-      const [waiter] = waiters.splice(index, 1);
-      waiter.resolve(frame);
+      const waiter = waiters[index];
+      waiters.splice(index, 1);
+      waiter?.resolve(frame);
       return;
     }
     queue.push(frame);
@@ -112,7 +113,13 @@ function createFrameQueue(child: TestChild): FrameQueue {
     timeoutMs = 3000,
   ): Promise<TestFrame> {
     const index = queue.findIndex(predicate);
-    if (index >= 0) return Promise.resolve(queue.splice(index, 1)[0]);
+    if (index >= 0) {
+      const frame = queue[index];
+      if (frame) {
+        queue.splice(index, 1);
+        return Promise.resolve(frame);
+      }
+    }
 
     return new Promise<TestFrame>((resolve, reject) => {
       const timer = setTimeout(() => {
@@ -156,7 +163,7 @@ async function startExtension(
   projectDir: string,
   env: Record<string, string> = {},
 ): Promise<Session> {
-  const child = spawn(process.execPath, ["src/index.ts"], {
+  const child = spawn(process.execPath, ["dist/index.js"], {
     cwd: EXT_DIR,
     env: { ...process.env, PWF_MODE: "parity", ...env },
     stdio: ["pipe", "pipe", "pipe"],

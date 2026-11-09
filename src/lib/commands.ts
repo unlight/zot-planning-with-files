@@ -54,8 +54,13 @@ function parseIntervalSpec(raw: string | undefined): number | undefined {
   const match = raw.trim().match(/^(\d+)([smhd])$/i);
   if (!match) return undefined;
 
-  const amount = Number(match[1]);
+  const rawAmount = match[1];
+  if (!rawAmount) return undefined;
+  const amount = Number(rawAmount);
   if (!Number.isFinite(amount) || amount <= 0) return undefined;
+
+  const unit = match[2]?.toLowerCase();
+  if (!unit) return undefined;
 
   const factors: Record<string, number> = {
     s: 1000,
@@ -63,7 +68,9 @@ function parseIntervalSpec(raw: string | undefined): number | undefined {
     h: 60 * 60 * 1000,
     d: 24 * 60 * 60 * 1000,
   };
-  return amount * factors[match[2].toLowerCase()];
+  const factor = factors[unit];
+  if (!factor) return undefined;
+  return amount * factor;
 }
 
 function isStopWord(value: string): boolean {
