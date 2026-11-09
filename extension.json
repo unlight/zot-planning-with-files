@@ -2,8 +2,8 @@
   "name": "planning-with-files",
   "version": "0.1.0",
   "exec": "node",
-  "args": ["index.mjs"],
-  "language": "javascript",
+  "args": ["src/index.ts"],
+  "language": "typescript",
   "description": "planning-with-files workflow for zot: plan status, attestation, execution approval, goal, and loop commands",
   "enabled": true
 }
