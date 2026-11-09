@@ -578,6 +578,63 @@ test('reports a missing plan and never injects one', async t => {
   assert.equal(intercept.system_prompt, undefined);
 });
 
+test('deduplicates identical notifications until user input', async t => {
+  const project = createProject({ withPlan: false });
+  t.after(() => rmSync(project, { recursive: true, force: true }));
+  const session = await startExtension(project);
+  t.after(() => session.close());
+
+  await session.beginSession('s1');
+
+  const sendWriteCall = (): void => {
+    session.send({
+      type: 'event',
+      event: 'tool_call',
+      tool_name: 'write',
+      tool_args: { path: 'x.txt' },
+      cwd: project,
+      session_id: 's1',
+    });
+  };
+
+  sendWriteCall();
+  const first = await session.frames.next(
+    frame =>
+      frame.type === 'notify' &&
+      typeof frame.message === 'string' &&
+      frame.message.includes('No task_plan.md found'),
+  );
+  assert.equal(
+    first.message,
+    'No task_plan.md found. Create planning files first.',
+  );
+
+  sendWriteCall();
+  await assert.rejects(
+    session.frames.next(frame => frame.type === 'notify', 300),
+    /timeout waiting for frame/,
+  );
+
+  session.send({
+    type: 'event',
+    event: 'user_prompt_submit',
+    text: 'new user prompt',
+    session_id: 's1',
+    cwd: project,
+  });
+  sendWriteCall();
+  const repeated = await session.frames.next(
+    frame =>
+      frame.type === 'notify' &&
+      typeof frame.message === 'string' &&
+      frame.message.includes('No task_plan.md found'),
+  );
+  assert.equal(
+    repeated.message,
+    'No task_plan.md found. Create planning files first.',
+  );
+});
+
 test('PLAN_ID binds resolution and a bad selector is refused', async t => {
   const project = createProject();
   t.after(() => rmSync(project, { recursive: true, force: true }));
