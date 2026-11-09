@@ -1,5 +1,4 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
 import path from 'node:path';
 import { checkPlanAttestation } from './attestation.ts';
 import {
@@ -50,21 +49,8 @@ export function resolveConfiguredMode(cwd: string): HookMode {
   const environmentMode = parseMode(process.env.PWF_MODE?.toLowerCase());
   if (environmentMode) return environmentMode;
 
-  const home = process.env.HOME || process.env.USERPROFILE || homedir();
-  const globalSettings = home
-    ? path.join(home, '.pi', 'agent', 'settings.json')
-    : undefined;
-  const projectZotSettings = path.join(cwd, '.zot', 'planning-with-files.json');
-  const projectPiSettings = path.join(cwd, '.pi', 'settings.json');
-
-  const projectMode =
-    readModeFromSettings(projectZotSettings) ??
-    readModeFromSettings(projectPiSettings);
-  const globalMode = globalSettings
-    ? readModeFromSettings(globalSettings)
-    : undefined;
-
-  return projectMode ?? globalMode ?? 'auto';
+  const projectSettings = path.join(cwd, '.zot', 'planning-with-files.json');
+  return readModeFromSettings(projectSettings) ?? 'auto';
 }
 
 export function deriveEffectiveMode(
