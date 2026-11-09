@@ -4,7 +4,6 @@ import { stderr, stdin, stdout } from "node:process";
 import { createHash } from "node:crypto";
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { homedir } from "node:os";
 // src/lib/plan.ts
 const SLUG_RE = /^[A-Za-z0-9_][A-Za-z0-9._-]*$/;
 const ANCHOR_WALK_CAP = 10;
@@ -347,13 +346,7 @@ function readModeFromSettings(filePath) {
 function resolveConfiguredMode(cwd) {
 	const environmentMode = parseMode(process.env.PWF_MODE?.toLowerCase());
 	if (environmentMode) return environmentMode;
-	const home = process.env.HOME || process.env.USERPROFILE || homedir();
-	const globalSettings = home ? path.join(home, ".pi", "agent", "settings.json") : void 0;
-	const projectZotSettings = path.join(cwd, ".zot", "planning-with-files.json");
-	const projectPiSettings = path.join(cwd, ".pi", "settings.json");
-	const projectMode = readModeFromSettings(projectZotSettings) ?? readModeFromSettings(projectPiSettings);
-	const globalMode = globalSettings ? readModeFromSettings(globalSettings) : void 0;
-	return projectMode ?? globalMode ?? "auto";
+	return readModeFromSettings(path.join(cwd, ".zot", "planning-with-files.json")) ?? "auto";
 }
 function deriveEffectiveMode(mode, host) {
 	if (mode !== "auto") return mode;
