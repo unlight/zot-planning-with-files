@@ -40,6 +40,7 @@ export default defineConfig(
       'unicorn/consistent-boolean-name': 'off',
       'unicorn/import-style': 'off',
       'unicorn/name-replacements': 'off',
+      '@typescript-eslint/no-floating-promises': 'off',
     },
   },
 );
