@@ -4,15 +4,23 @@ A zot extension for the `planning-with-files` workflow. It keeps the
 three-file workflow (`task_plan.md`, `findings.md`, `progress.md`) on disk and
 adds plan status, attestation, execution approval, goal, and loop commands.
 
+- Repository: <https://github.com/unlight/zot-planning-with-files>
 - Upstream project: <https://github.com/OthmanAdi/planning-with-files>
 - zot extension protocol: <https://github.com/patriceckhart/zot/blob/main/docs/extensions.md>
 
 ## Quick start
 
-1. Install the extension:
+1. Install the extension from GitHub:
 
    ```bash
-   zot ext install /path/to/zot-planning-with-files
+   zot ext install https://github.com/unlight/zot-planning-with-files.git
+   ```
+
+   Or clone and install locally:
+
+   ```bash
+   git clone https://github.com/unlight/zot-planning-with-files.git
+   zot ext install ./zot-planning-with-files
    ```
 
    Or load a working copy for one session:
