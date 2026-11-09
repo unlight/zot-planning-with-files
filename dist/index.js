@@ -7,7 +7,7 @@ import path from "node:path";
 // extension.json
 var extension_default = {
 	name: "planning-with-files",
-	version: "0.1.0",
+	version: "1.0.0",
 	exec: "./dist/index.js",
 	language: "typescript",
 	description: "planning-with-files workflow for zot: plan status, attestation, execution approval, goal, and loop commands",
