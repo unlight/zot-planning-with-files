@@ -1,0 +1,10 @@
+{
+  "name": "zot-planning-with-files",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "zot extension that ports the planning-with-files pi-agent commands",
+  "scripts": {
+    "test": "node --test"
+  }
+}
