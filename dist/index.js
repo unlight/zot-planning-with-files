@@ -422,7 +422,8 @@ function createState() {
 		loopTimersBySession: /* @__PURE__ */ new Map(),
 		goalBySession: /* @__PURE__ */ new Map(),
 		executionApprovedBySessionPlan: /* @__PURE__ */ new Set(),
-		extensionSubmits: /* @__PURE__ */ new Map()
+		extensionSubmits: /* @__PURE__ */ new Map(),
+		lastNotification: void 0
 	};
 }
 function planSessionKey(sessionId, status) {
@@ -780,11 +781,15 @@ function handleEvent(frame, context) {
 		case "tool_result":
 			onToolResult(frame, context);
 			break;
-		case "pre_compact": onPreCompact(context);
+		case "pre_compact":
+			onPreCompact(context);
+			break;
+		case "post_compact": onPostCompact(context);
 	}
 }
 function onSessionStart(context) {
 	const state = context.state;
+	state.lastNotification = void 0;
 	clearSessionAutoContinue(state, state.sessionId);
 	clearSessionApprovals(state, state.sessionId);
 	clearSessionLoop(state, state.sessionId);
@@ -803,6 +808,7 @@ function onSessionStart(context) {
 }
 function onSessionEnd(context) {
 	const state = context.state;
+	state.lastNotification = void 0;
 	clearSessionAutoContinue(state, state.sessionId);
 	clearSessionApprovals(state, state.sessionId);
 	clearSessionLoop(state, state.sessionId);
@@ -816,6 +822,7 @@ function onUserPromptSubmit(frame, context) {
 		else state.extensionSubmits.set(text, pending - 1);
 		return;
 	}
+	state.lastNotification = void 0;
 	clearSessionAutoContinue(state, state.sessionId);
 }
 function onTurnEnd(frame, context) {
@@ -878,6 +885,9 @@ function onPreCompact(context) {
 		attestation.enabled && attestation.expected ? `Plan-SHA256 at compaction: ${attestation.expected}` : ""
 	].filter(Boolean).join("\n");
 	context.notify("info", reminder);
+}
+function onPostCompact(context) {
+	context.state.lastNotification = void 0;
 }
 function handleBeforeAgentStart(frame, context) {
 	const state = context.state;
@@ -955,11 +965,20 @@ function log(message) {
 		stderr.write(`[${NAME}] ${message}\n`);
 	} catch {}
 }
+const NOTIFICATION_PREFIX = "[planning-with-files] ";
 function notify(level, message, isStartup = false) {
+	const text = message.startsWith(NOTIFICATION_PREFIX) ? message.slice(22) : message;
+	const key = JSON.stringify([
+		level,
+		text,
+		isStartup
+	]);
+	if (state.lastNotification === key) return;
+	state.lastNotification = key;
 	const frame = {
 		type: "notify",
 		level,
-		message
+		message: text
 	};
 	if (isStartup) frame.startup = true;
 	send(frame);
