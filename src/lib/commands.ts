@@ -12,11 +12,13 @@ import {
   DEFAULT_GOAL_CONDITION,
   DEFAULT_LOOP_INTERVAL_MS,
   DEFAULT_LOOP_PROMPT,
-  INVALID_PLAN_ROOT_NOTICE,
-  PLAN_SELECTOR_REJECTED_NOTICE,
-  SESSION_PLAN_AMBIGUOUS_NOTICE,
 } from './constants.ts';
-import { buildTamperMessage, summarizePlan } from './runtime.ts';
+import {
+  buildTamperMessage,
+  selectionErrorNotice,
+  summarizePlan,
+} from './runtime.ts';
+import { handlePwf, handlePwfStatus } from './pwf.ts';
 import {
   approveExecution,
   clearExecution,
@@ -24,23 +26,6 @@ import {
   isExecutionApproved,
 } from './state.ts';
 import type { CommandResponse, PlanStatus, ProtocolContext } from './types.ts';
-
-export function selectionErrorNotice(status: PlanStatus): string {
-  switch (status.selectionError) {
-    case 'session-plan-ambiguous': {
-      return SESSION_PLAN_AMBIGUOUS_NOTICE;
-    }
-    case 'invalid-plan-root': {
-      return INVALID_PLAN_ROOT_NOTICE;
-    }
-    case 'plan-selector-rejected': {
-      return PLAN_SELECTOR_REJECTED_NOTICE;
-    }
-    default: {
-      return '';
-    }
-  }
-}
 
 function notifySelectionError(
   status: PlanStatus,
@@ -105,6 +90,12 @@ export function handleCommand(
     }
     case 'plan-loop': {
       return handlePlanLoop(commandArguments, context);
+    }
+    case 'pwf': {
+      return handlePwf(commandArguments);
+    }
+    case 'pwf-status': {
+      return handlePwfStatus(context);
     }
     default: {
       return { action: 'noop', error: `unknown command /${name}` };

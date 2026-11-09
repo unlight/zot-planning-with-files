@@ -10,12 +10,12 @@ import {
   CACHE_SAFE_REMINDER,
   POST_WRITE_REMINDER,
 } from './constants.ts';
-import { selectionErrorNotice } from './commands.ts';
 import {
   buildParityPlanInjection,
   buildTamperMessage,
   deriveEffectiveMode,
   resolveConfiguredMode,
+  selectionErrorNotice,
   summarizePlan,
 } from './runtime.ts';
 import {

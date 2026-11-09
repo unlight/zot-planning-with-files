@@ -134,6 +134,8 @@ export interface CommandResponse {
   error?: string;
   prompt?: string;
   insert?: string;
+  tool_name?: string;
+  tool_args?: Record<string, unknown>;
 }
 
 export interface ProtocolContext {

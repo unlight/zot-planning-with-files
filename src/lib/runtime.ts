@@ -4,8 +4,11 @@ import path from 'node:path';
 import { checkPlanAttestation } from './attestation.ts';
 import {
   CACHE_SAFE_REMINDER,
+  INVALID_PLAN_ROOT_NOTICE,
   PLAN_DATA_BEGIN,
   PLAN_DATA_END,
+  PLAN_SELECTOR_REJECTED_NOTICE,
+  SESSION_PLAN_AMBIGUOUS_NOTICE,
   TAMPERED_PREFIX,
 } from './constants.ts';
 import type { EffectiveMode, HookMode, HostInfo, PlanStatus } from './types.ts';
@@ -74,6 +77,23 @@ export function deriveEffectiveMode(
   return provider.includes('deepseek') || model.includes('deepseek')
     ? 'cache-safe'
     : 'parity';
+}
+
+export function selectionErrorNotice(status: PlanStatus): string {
+  switch (status.selectionError) {
+    case 'session-plan-ambiguous': {
+      return SESSION_PLAN_AMBIGUOUS_NOTICE;
+    }
+    case 'invalid-plan-root': {
+      return INVALID_PLAN_ROOT_NOTICE;
+    }
+    case 'plan-selector-rejected': {
+      return PLAN_SELECTOR_REJECTED_NOTICE;
+    }
+    default: {
+      return '';
+    }
+  }
 }
 
 export function summarizePlan(status: PlanStatus): string {

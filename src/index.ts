@@ -40,6 +40,14 @@ const COMMANDS: Array<{ name: string; description: string }> = [
     name: 'plan-loop',
     description: 'start or stop planning-loop ticks (default 10m)',
   },
+  {
+    name: 'pwf',
+    description: 'start the planning-with-files workflow',
+  },
+  {
+    name: 'pwf-status',
+    description: 'show a compact planning status',
+  },
 ];
 
 const EVENTS: string[] = [
