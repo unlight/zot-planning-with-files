@@ -64,6 +64,8 @@ injected into model context. Review and edit the plan before approving it.
 
 | Command                             | Arguments           | Behavior                                                                                           |
 | ----------------------------------- | ------------------- | -------------------------------------------------------------------------------------------------- |
+| `/pwf [task]`                       | optional task       | Load the upstream `planning-with-files` skill and start the workflow.                              |
+| `/pwf-status`                       | none                | Show a compact status block: plan, scope, mode, attestation, current phase, and phase counts.      |
 | `/plan-status`                      | none                | Show the selected plan path, scope, plan ID, phase counts, attestation state, and execution state. |
 | `/plan-attest`                      | none                | Record the SHA-256 of `task_plan.md` in `.planning/<id>/.attestation` or `./.plan-attestation`.    |
 | `/plan-attest --show`               | none                | Print the stored hash, the current hash, and whether they match.                                   |
@@ -80,8 +82,25 @@ injected into model context. Review and edit the plan before approving it.
 | `/plan-loop <interval> <prompt...>` | interval and prompt | Start a tick with a custom prompt.                                                                 |
 | `/plan-loop stop`                   | none                | Stop the session loop.                                                                             |
 
-The command names and argument forms match the Pi Agent extension documented in
-`docs/pi-agent.md`.
+The `/plan-*` names and argument forms match the Pi Agent extension documented
+in `docs/pi-agent.md`. `/pwf` and `/pwf-status` are host-style aliases.
+
+### Why both `/plan-*` and `/pwf*`?
+
+`/plan-*` is the Pi Agent command surface. It contains operations that `/pwf*`
+does not cover: attestation, execution approval, goal, and loop.
+
+`/pwf` and `/pwf-status` are the shortcuts used by OpenCode, Hermes, and
+DeepSeek Harness. They are kept as aliases:
+
+- `/pwf` loads the upstream `planning-with-files` skill through zot's
+  `tool_prompt` action and submits the optional task text.
+- `/pwf-status` prints the compact status block used by those hosts.
+
+Removing `/plan-*` would drop four operations or force inventing
+`/pwf-attest`, `/pwf-execute`, `/pwf-goal`, and `/pwf-loop`, which no upstream
+host defines. Keeping both preserves Pi compatibility and adds the familiar
+shortcuts.
 
 ## Plan selection
 
@@ -178,7 +197,8 @@ The extension also:
 ## Upstream skill
 
 The extension does not bundle the `planning-with-files` skill. Install it
-separately so the model has the three-file workflow instructions:
+separately so the model has the three-file workflow instructions. `/pwf` loads
+this skill through zot's `tool_prompt` action:
 
 ```bash
 npx skills add OthmanAdi/planning-with-files --skill planning-with-files -g
@@ -208,6 +228,7 @@ src/lib/runtime.ts                      mode resolution and injection text
 src/lib/state.ts                        per-session state
 src/lib/commands.ts                     command handlers
 src/lib/hooks.ts                        events and before_agent_start
+src/lib/pwf.ts                          /pwf and /pwf-status handlers
 test/extension.test.ts                  stdio protocol tests
 tsconfig.json                           type-checking config
 .github/workflows/ci.yml                lint, format, test, bundle check, release
@@ -243,8 +264,8 @@ committed, and CI fails if the committed file differs from a fresh build.
 
 The suite drives the extension over its stdio protocol and covers command
 registration, plan status, attestation, approval, injection, tamper blocking,
-auto-continue limits, loop ticks, missing plans, selector rejection, invalid
-root pins, and DeepSeek cache-safe mode.
+auto-continue limits, loop ticks, `/pwf` aliases, missing plans, selector
+rejection, invalid root pins, and DeepSeek cache-safe mode.
 
 Drive the extension by hand:
 
