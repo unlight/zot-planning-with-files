@@ -1,6 +1,6 @@
 {
   "name": "planning-with-files",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "exec": "./dist/index.js",
   "language": "typescript",
   "description": "planning-with-files workflow for zot: plan status, attestation, execution approval, close, goal, and loop commands",
