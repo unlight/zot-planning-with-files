@@ -2,9 +2,9 @@
 // zot-specific event mapping and injection behavior adapted from docs/extensions.md.
 import {
   isAllPhasesComplete,
-  isPlanIncomplete,
   isSessionAttached,
   readPlanStatus,
+  shouldAutoContinue,
 } from './plan.ts';
 import { checkPlanAttestation } from './attestation.ts';
 import {
@@ -193,7 +193,11 @@ function onTurnEnd(frame: EventFrame, context: ProtocolContext): void {
     return;
   }
 
-  if (isFailedTurn(frame) || !isPlanIncomplete(status)) return;
+  if (isFailedTurn(frame)) return;
+  if (!shouldAutoContinue(status)) {
+    debug(context, 'auto-continue skipped: no in_progress phase');
+    return;
+  }
 
   if (!isExecutionApproved(state, sessionId, status)) {
     context.notify(
@@ -232,7 +236,8 @@ function onTurnEnd(frame: EventFrame, context: ProtocolContext): void {
   const goal = state.goalBySession.get(sessionId);
   const message =
     `[planning-with-files] Task incomplete (${status.completePhases}/${status.totalPhases} phases done). ` +
-    'Update progress.md with what was done, then read task_plan.md and continue remaining phases.' +
+    'Continue only the current in_progress phase. Do not start a new phase or expand scope. ' +
+    'Update progress.md when the phase state changes, then read task_plan.md.' +
     (goal ? ` Goal: ${goal}` : '');
 
   context.submit(message);

@@ -297,6 +297,7 @@ export function readPlanStatus(
       completePhases: 0,
       inProgressPhases: 0,
       pendingPhases: 0,
+      blockedPhases: 0,
       firstLines50: '',
       headLines30: '',
       progressTail20: '',
@@ -322,28 +323,28 @@ export function readPlanStatus(
       : planBytes.toString('utf8').replaceAll('\r\n', '\n');
   const isClosed = /<!--\s*pwf:\s*closed\s*-->/i.test(planContent);
   const lines = planContent.split('\n');
-
   const phaseRegex = /^###\s+Phase\b/i;
   const statusComplete = /\*\*Status:\*\*\s*complete\b/i;
   const statusInProgress = /\*\*Status:\*\*\s*in_progress\b/i;
   const statusPending = /\*\*Status:\*\*\s*pending\b/i;
-
+  const statusBlocked = /\*\*Status:\*\*\s*blocked\b/i;
   let totalPhases = 0;
   let completePhases = 0;
   let inProgressPhases = 0;
   let pendingPhases = 0;
-
+  let blockedPhases = 0;
   for (const line of lines) {
     if (phaseRegex.test(line)) totalPhases += 1;
     if (statusComplete.test(line)) completePhases += 1;
     else if (statusInProgress.test(line)) inProgressPhases += 1;
     else if (statusPending.test(line)) pendingPhases += 1;
+    else if (statusBlocked.test(line)) blockedPhases += 1;
   }
-
-  if (completePhases + inProgressPhases + pendingPhases === 0) {
+  if (completePhases + inProgressPhases + pendingPhases + blockedPhases === 0) {
     completePhases = (planContent.match(/\[complete\]/gi) || []).length;
     inProgressPhases = (planContent.match(/\[in_progress\]/gi) || []).length;
     pendingPhases = (planContent.match(/\[pending\]/gi) || []).length;
+    blockedPhases = (planContent.match(/\[blocked\]/gi) || []).length;
   }
 
   let progressTail20 = '';
@@ -364,6 +365,7 @@ export function readPlanStatus(
     completePhases,
     inProgressPhases,
     pendingPhases,
+    blockedPhases,
     firstLines50: lines.slice(0, 50).join('\n'),
     headLines30: lines.slice(0, 30).join('\n'),
     progressTail20,
@@ -378,11 +380,12 @@ export function isAllPhasesComplete(status: PlanStatus): boolean {
   );
 }
 
-export function isPlanIncomplete(status: PlanStatus): boolean {
+export function shouldAutoContinue(status: PlanStatus): boolean {
   return (
     status.exists &&
+    !status.isClosed &&
     status.totalPhases > 0 &&
-    status.completePhases < status.totalPhases
+    status.inProgressPhases > 0
   );
 }
 

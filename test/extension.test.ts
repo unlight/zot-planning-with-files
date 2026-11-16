@@ -298,6 +298,7 @@ test('registers the planning command surface', async t => {
   assert.match(response.display ?? '', /Phases: 2/);
   assert.match(response.display ?? '', /Complete: 0/);
   assert.match(response.display ?? '', /In progress: 1/);
+  assert.match(response.display ?? '', /Blocked: 0/);
   assert.match(response.display ?? '', /Attestation: not recorded/);
   assert.match(response.display ?? '', /Execution: passive/);
 });
@@ -326,7 +327,7 @@ test('pwf aliases start the workflow and show status', async t => {
   assert.match(status.display ?? '', /Current: Phase 1: One/);
   assert.match(
     status.display ?? '',
-    /Phases: 0\/2 complete, 1 in progress, 1 pending/,
+    /Phases: 0\/2 complete, 1 in progress, 1 pending, 0 blocked/,
   );
   assert.match(status.display ?? '', /Attestation: not recorded/);
   assert.match(status.display ?? '', /Execution: passive/);
@@ -491,6 +492,104 @@ test('turn_end auto-continues three times and then stops', async t => {
     frame => frame.type === 'submit',
   );
   assert.match(afterReset.text ?? '', /Task incomplete/);
+});
+
+test('turn_end does not auto-continue without an in_progress phase', async t => {
+  const project = createProject();
+  t.after(() => rmSync(project, { recursive: true, force: true }));
+  writeFileSync(
+    join(project, 'task_plan.md'),
+    `# Task Plan: Test
+
+## Phases
+
+### Phase 1: One
+
+- [ ] alpha
+- **Status:** pending
+
+### Phase 2: Two
+
+- [ ] beta
+- **Status:** pending
+`,
+  );
+  const session = await startExtension(project);
+  t.after(() => session.close());
+
+  await session.beginSession('s1');
+  await session.command('plan-attest');
+  await session.command('plan-execute');
+  await session.frames.next(
+    frame =>
+      frame.type === 'notify' &&
+      typeof frame.message === 'string' &&
+      frame.message.includes('Plan execution approved'),
+  );
+
+  session.send({
+    type: 'event',
+    event: 'turn_end',
+    stop: 'end_turn',
+    session_id: 's1',
+    cwd: project,
+  });
+  await new Promise(resolve => setTimeout(resolve, 300));
+  assert.equal(
+    session.frames.queue.some(frame => frame.type === 'submit'),
+    false,
+  );
+});
+
+test('blocked phase is reported and does not auto-continue', async t => {
+  const project = createProject();
+  t.after(() => rmSync(project, { recursive: true, force: true }));
+  writeFileSync(
+    join(project, 'task_plan.md'),
+    `# Task Plan: Test
+
+## Phases
+
+### Phase 1: One
+
+- [x] alpha
+- **Status:** complete
+
+### Phase 2: Two
+
+- [ ] beta
+- **Status:** blocked
+`,
+  );
+  const session = await startExtension(project);
+  t.after(() => session.close());
+
+  await session.beginSession('s1');
+  const status = await session.command('plan-status');
+  assert.match(status.display ?? '', /Complete: 1/);
+  assert.match(status.display ?? '', /Pending: 0/);
+  assert.match(status.display ?? '', /Blocked: 1/);
+
+  await session.command('plan-execute');
+  await session.frames.next(
+    frame =>
+      frame.type === 'notify' &&
+      typeof frame.message === 'string' &&
+      frame.message.includes('Plan execution approved'),
+  );
+
+  session.send({
+    type: 'event',
+    event: 'turn_end',
+    stop: 'end_turn',
+    session_id: 's1',
+    cwd: project,
+  });
+  await new Promise(resolve => setTimeout(resolve, 300));
+  assert.equal(
+    session.frames.queue.some(frame => frame.type === 'submit'),
+    false,
+  );
 });
 
 test('plan-loop submits a tick and stops on command', async t => {

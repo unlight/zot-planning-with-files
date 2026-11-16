@@ -80,7 +80,7 @@ export function handlePwfStatus(context: ProtocolContext): CommandResponse {
     `Attestation: ${attestation.enabled ? (attestation.tampered ? 'TAMPERED' : 'valid') : 'not recorded'}`,
     `Execution: ${isApproved ? 'active' : 'passive (run /plan-execute)'}`,
     `Current: ${currentPhaseName(status)}`,
-    `Phases: ${status.completePhases}/${status.totalPhases} complete, ${status.inProgressPhases} in progress, ${status.pendingPhases} pending`,
+    `Phases: ${status.completePhases}/${status.totalPhases} complete, ${status.inProgressPhases} in progress, ${status.pendingPhases} pending, ${status.blockedPhases} blocked`,
   ];
 
   return { action: 'display', display: lines.join('\n') };

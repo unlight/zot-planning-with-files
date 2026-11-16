@@ -25,6 +25,7 @@ export interface PlanStatus extends PlanPaths {
   completePhases: number;
   inProgressPhases: number;
   pendingPhases: number;
+  blockedPhases: number;
   firstLines50: string;
   headLines30: string;
   progressTail20: string;

@@ -125,6 +125,7 @@ function handlePlanStatus(context: ProtocolContext): CommandResponse {
     `Complete: ${status.completePhases}`,
     `In progress: ${status.inProgressPhases}`,
     `Pending: ${status.pendingPhases}`,
+    `Blocked: ${status.blockedPhases}`,
     `Attestation: ${attestation.enabled ? (attestation.tampered ? 'TAMPERED' : 'valid') : 'not recorded'}`,
     `Execution: ${isApproved ? 'active' : 'passive (run /plan-execute)'}`,
   ];

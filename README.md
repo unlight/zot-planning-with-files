@@ -117,8 +117,10 @@ ends.
 
 Ask the model to execute the current phase, or tell it to continue. The model
 updates `progress.md`, marks phase status in `task_plan.md`, and proceeds. After
-a terminal turn, the extension submits a continuation prompt while phases remain
-incomplete, up to three times per user prompt.
+a terminal turn, the extension submits a continuation prompt only while a phase
+is `in_progress`, up to three times per user prompt. If the next phase is
+`pending` or `blocked`, the session stops at a checkpoint. Mark the next phase
+`in_progress` when you want the agent to continue.
 
 Optional goal text appended to auto-continue prompts:
 
@@ -276,18 +278,38 @@ Run /plan-attest to re-approve current contents, or restore the file from git.
 The attestation is an ordinary local SHA-256 value. It detects a plan change
 only while the saved digest remains trusted. It is not a keyed signature.
 
+## Phase statuses and auto-continue
+
+The extension reads four phase statuses from `task_plan.md`:
+
+```text
+pending
+in_progress
+complete
+blocked
+```
+
+Auto-continue runs only while at least one phase is `in_progress`. When the last
+active phase becomes `complete`, `pending`, or `blocked`, the extension stops
+submitting continuation prompts and waits for the next user message. This keeps
+an approved plan from being pushed through phases that have not been started or
+are waiting on a human decision.
+
+`blocked` is a zot extension status. The upstream `check-complete.sh` validator
+only accepts `pending`, `in_progress`, and `complete`.
+
 ## Lifecycle behavior
 
 The extension uses the lifecycle events and interception points zot provides:
 
-| Behavior                               | zot implementation                                                                                               |
-| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| Session catchup on `session_start`     | Startup notification with the phase summary and the `/plan-execute` hint. No host session-store access.          |
-| Plan injection on `before_agent_start` | `before_agent_start` intercept appends to the complete system prompt.                                            |
-| Pre-tool plan recitation               | Not available without starting a turn. The injected prompt and auto-continue tell the model to re-read the plan. |
-| Post-write reminder on `tool_result`   | `notify` reminder after `write` or `edit`. zot cannot append text to a tool result.                              |
-| Auto-continue on `agent_end`           | `turn_end` with a terminal stop reason, then `submit` with the continuation prompt, limit 3.                     |
-| Pre-compaction reminder                | `pre_compact` notification, including the attested hash when present.                                            |
+| Behavior                               | zot implementation                                                                                                                |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Session catchup on `session_start`     | Startup notification with the phase summary and the `/plan-execute` hint. No host session-store access.                           |
+| Plan injection on `before_agent_start` | `before_agent_start` intercept appends to the complete system prompt.                                                             |
+| Pre-tool plan recitation               | Not available without starting a turn. The injected prompt and auto-continue tell the model to re-read the plan.                  |
+| Post-write reminder on `tool_result`   | `notify` reminder after `write` or `edit`. zot cannot append text to a tool result.                                               |
+| Auto-continue on `agent_end`           | `turn_end` with a terminal stop reason, then `submit` with the continuation prompt, limit 3, only while a phase is `in_progress`. |
+| Pre-compaction reminder                | `pre_compact` notification, including the attested hash when present.                                                             |
 
 The extension also:
 

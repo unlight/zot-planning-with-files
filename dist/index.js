@@ -193,6 +193,7 @@ function readPlanStatus(cwd, pathsOverride) {
 		completePhases: 0,
 		inProgressPhases: 0,
 		pendingPhases: 0,
+		blockedPhases: 0,
 		firstLines50: "",
 		headLines30: "",
 		progressTail20: ""
@@ -212,20 +213,24 @@ function readPlanStatus(cwd, pathsOverride) {
 	const statusComplete = /\*\*Status:\*\*\s*complete\b/i;
 	const statusInProgress = /\*\*Status:\*\*\s*in_progress\b/i;
 	const statusPending = /\*\*Status:\*\*\s*pending\b/i;
+	const statusBlocked = /\*\*Status:\*\*\s*blocked\b/i;
 	let totalPhases = 0;
 	let completePhases = 0;
 	let inProgressPhases = 0;
 	let pendingPhases = 0;
+	let blockedPhases = 0;
 	for (const line of lines) {
 		if (phaseRegex.test(line)) totalPhases += 1;
 		if (statusComplete.test(line)) completePhases += 1;
 		else if (statusInProgress.test(line)) inProgressPhases += 1;
 		else if (statusPending.test(line)) pendingPhases += 1;
+		else if (statusBlocked.test(line)) blockedPhases += 1;
 	}
-	if (completePhases + inProgressPhases + pendingPhases === 0) {
+	if (completePhases + inProgressPhases + pendingPhases + blockedPhases === 0) {
 		completePhases = (planContent.match(/\[complete\]/gi) || []).length;
 		inProgressPhases = (planContent.match(/\[in_progress\]/gi) || []).length;
 		pendingPhases = (planContent.match(/\[pending\]/gi) || []).length;
+		blockedPhases = (planContent.match(/\[blocked\]/gi) || []).length;
 	}
 	let progressTail20 = "";
 	if (paths.progressPath && existsSync(paths.progressPath)) progressTail20 = normalizeWallClock(safeRead(paths.progressPath).replaceAll("\r\n", "\n").split("\n").slice(-20).join("\n"));
@@ -239,6 +244,7 @@ function readPlanStatus(cwd, pathsOverride) {
 		completePhases,
 		inProgressPhases,
 		pendingPhases,
+		blockedPhases,
 		firstLines50: lines.slice(0, 50).join("\n"),
 		headLines30: lines.slice(0, 30).join("\n"),
 		progressTail20
@@ -247,8 +253,8 @@ function readPlanStatus(cwd, pathsOverride) {
 function isAllPhasesComplete(status) {
 	return status.exists && status.totalPhases > 0 && status.completePhases >= status.totalPhases;
 }
-function isPlanIncomplete(status) {
-	return status.exists && status.totalPhases > 0 && status.completePhases < status.totalPhases;
+function shouldAutoContinue(status) {
+	return status.exists && !status.isClosed && status.totalPhases > 0 && status.inProgressPhases > 0;
 }
 function isSessionAttached(cwd, sessionId) {
 	const sessionsDirectory = path.join(cwd, ".planning", "sessions");
@@ -496,7 +502,7 @@ function handlePwfStatus(context) {
 			`Attestation: ${attestation.enabled ? attestation.tampered ? "TAMPERED" : "valid" : "not recorded"}`,
 			`Execution: ${isApproved ? "active" : "passive (run /plan-execute)"}`,
 			`Current: ${currentPhaseName(status)}`,
-			`Phases: ${status.completePhases}/${status.totalPhases} complete, ${status.inProgressPhases} in progress, ${status.pendingPhases} pending`
+			`Phases: ${status.completePhases}/${status.totalPhases} complete, ${status.inProgressPhases} in progress, ${status.pendingPhases} pending, ${status.blockedPhases} blocked`
 		].join("\n")
 	};
 }
@@ -570,6 +576,7 @@ function handlePlanStatus(context) {
 			`Complete: ${status.completePhases}`,
 			`In progress: ${status.inProgressPhases}`,
 			`Pending: ${status.pendingPhases}`,
+			`Blocked: ${status.blockedPhases}`,
 			`Attestation: ${attestation.enabled ? attestation.tampered ? "TAMPERED" : "valid" : "not recorded"}`,
 			`Execution: ${isApproved ? "active" : "passive (run /plan-execute)"}`
 		].join("\n")
@@ -841,7 +848,11 @@ function onTurnEnd(frame, context) {
 		context.notify("info", `[planning-with-files] ALL PHASES COMPLETE (${status.completePhases}/${status.totalPhases}).`);
 		return;
 	}
-	if (isFailedTurn(frame) || !isPlanIncomplete(status)) return;
+	if (isFailedTurn(frame)) return;
+	if (!shouldAutoContinue(status)) {
+		debug(context, "auto-continue skipped: no in_progress phase");
+		return;
+	}
 	if (!isExecutionApproved(state, sessionId, status)) {
 		context.notify("warn", `[planning-with-files] Task incomplete (${status.completePhases}/${status.totalPhases}). Run /plan-execute to activate hooks.`);
 		return;
@@ -858,7 +869,7 @@ function onTurnEnd(frame, context) {
 	state.autoContinueBySessionPlan.set(planKey, current + 1);
 	debug(context, `auto-continue ${current + 1}/3 for ${sessionId} (${status.completePhases}/${status.totalPhases} phases)`);
 	const goal = state.goalBySession.get(sessionId);
-	const message = `[planning-with-files] Task incomplete (${status.completePhases}/${status.totalPhases} phases done). Update progress.md with what was done, then read task_plan.md and continue remaining phases.` + (goal ? ` Goal: ${goal}` : "");
+	const message = `[planning-with-files] Task incomplete (${status.completePhases}/${status.totalPhases} phases done). Continue only the current in_progress phase. Do not start a new phase or expand scope. Update progress.md when the phase state changes, then read task_plan.md.` + (goal ? ` Goal: ${goal}` : "");
 	context.submit(message);
 }
 function onToolCall(frame, context) {
