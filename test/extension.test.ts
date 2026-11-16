@@ -20,6 +20,7 @@ const EXT_DIR = dirname(dirname(import.meta.filename));
 const EXPECTED_COMMANDS = [
   'plan-status',
   'plan-attest',
+  'plan-close',
   'plan-execute',
   'plan-goal',
   'plan-loop',
@@ -391,6 +392,114 @@ test('plan-execute activates the before_agent_start injection', async t => {
   assert.match(response.system_prompt ?? '', /===BEGIN PLAN DATA===/);
   assert.match(response.system_prompt ?? '', /### Phase 1: One/);
   assert.match(response.system_prompt ?? '', /=== recent progress ===/);
+});
+
+test('plan-close closes the plan and reopens it', async t => {
+  const project = createProject();
+  t.after(() => rmSync(project, { recursive: true, force: true }));
+  const session = await startExtension(project);
+  t.after(() => session.close());
+
+  await session.beginSession('s1');
+  await session.command('plan-attest');
+  await session.command('plan-execute');
+  await session.frames.next(
+    frame =>
+      frame.type === 'notify' &&
+      typeof frame.message === 'string' &&
+      frame.message.includes('Plan execution approved'),
+  );
+
+  const closed = await session.command('plan-close');
+  assert.equal(closed.action, 'noop');
+  const closedNotify = await session.frames.next(
+    frame =>
+      frame.type === 'notify' &&
+      typeof frame.message === 'string' &&
+      frame.message.includes('Plan closed'),
+  );
+  assert.match(closedNotify.message ?? '', /Execution approval cleared/);
+  assert.match(
+    readFileSync(join(project, 'task_plan.md'), 'utf8'),
+    /<!-- pwf: closed -->/,
+  );
+
+  const closedStatus = await session.command('plan-status');
+  assert.match(closedStatus.display ?? '', /Closed: yes/);
+  assert.match(closedStatus.display ?? '', /Execution: closed/);
+  assert.match(closedStatus.display ?? '', /Attestation: not recorded/);
+
+  session.send({
+    type: 'event',
+    event: 'turn_end',
+    stop: 'end_turn',
+    session_id: 's1',
+    cwd: project,
+  });
+  await new Promise(resolve => setTimeout(resolve, 300));
+  assert.equal(
+    session.frames.queue.some(frame => frame.type === 'submit'),
+    false,
+  );
+
+  session.send({
+    type: 'event_intercept',
+    id: 'closed-start',
+    event: 'before_agent_start',
+    system_prompt: 'BASE PROMPT',
+    cwd: project,
+    session_id: 's1',
+  });
+  const intercept = await session.frames.next(
+    frame =>
+      frame.type === 'event_intercept_response' && frame.id === 'closed-start',
+  );
+  assert.equal(intercept.system_prompt, undefined);
+
+  const refused = await session.command('plan-execute');
+  assert.equal(refused.action, 'noop');
+  const refusedNotify = await session.frames.next(
+    frame =>
+      frame.type === 'notify' &&
+      typeof frame.message === 'string' &&
+      frame.message.includes('Plan is closed'),
+  );
+  assert.match(refusedNotify.message ?? '', /plan-close clear/);
+
+  await session.command('plan-close', 'clear');
+  await session.frames.next(
+    frame =>
+      frame.type === 'notify' &&
+      typeof frame.message === 'string' &&
+      frame.message.includes('Plan reopened'),
+  );
+  assert.doesNotMatch(
+    readFileSync(join(project, 'task_plan.md'), 'utf8'),
+    /<!-- pwf: closed -->/,
+  );
+
+  const reopenedStatus = await session.command('plan-status');
+  assert.match(reopenedStatus.display ?? '', /Closed: no/);
+  assert.match(reopenedStatus.display ?? '', /Execution: passive/);
+
+  await session.command('plan-attest');
+  await session.command('plan-execute');
+  await session.frames.next(
+    frame =>
+      frame.type === 'notify' &&
+      typeof frame.message === 'string' &&
+      frame.message.includes('Plan execution approved'),
+  );
+
+  session.send({
+    type: 'event',
+    event: 'turn_end',
+    stop: 'end_turn',
+    session_id: 's1',
+    cwd: project,
+  });
+  const submit = await session.frames.next(frame => frame.type === 'submit');
+  assert.match(submit.text ?? '', /Task incomplete/);
 });
 
 test('a changed plan is blocked from injection', async t => {

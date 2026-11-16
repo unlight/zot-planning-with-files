@@ -138,6 +138,10 @@ function onSessionStart(context: ProtocolContext): void {
     );
     return;
   }
+  if (status.isClosed) {
+    context.notify('info', `${summarizePlan(status)} - plan closed`, true);
+    return;
+  }
   context.notify(
     'info',
     `${summarizePlan(status)} - run /plan-execute to activate hooks`,
@@ -277,6 +281,7 @@ function onToolResult(frame: EventFrame, context: ProtocolContext): void {
   const status = readPlanStatus(context.state.cwd);
   if (
     !status.exists ||
+    status.isClosed ||
     !isExecutionApproved(context.state, context.state.sessionId, status)
   )
     return;
@@ -286,7 +291,7 @@ function onToolResult(frame: EventFrame, context: ProtocolContext): void {
 
 function onPreCompact(context: ProtocolContext): void {
   const status = readPlanStatus(context.state.cwd);
-  if (!status.exists) return;
+  if (!status.exists || status.isClosed) return;
 
   const attestation = checkPlanAttestation(status);
   const reminder = [
@@ -323,6 +328,7 @@ export function handleBeforeAgentStart(
   if (notice) return appendBlock(frame.system_prompt, notice);
   if (
     !status.exists ||
+    status.isClosed ||
     !isSessionAttached(status.cwd, state.sessionId) ||
     !isExecutionApproved(state, state.sessionId, status)
   ) {

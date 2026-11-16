@@ -10,7 +10,7 @@ var extension_default = {
 	version: "1.0.0",
 	exec: "./dist/index.js",
 	language: "typescript",
-	description: "planning-with-files workflow for zot: plan status, attestation, execution approval, goal, and loop commands",
+	description: "planning-with-files workflow for zot: plan status, attestation, execution approval, close, goal, and loop commands",
 	enabled: true
 };
 // src/lib/plan.ts
@@ -326,6 +326,7 @@ function clearPlanAttestation(status) {
 // src/lib/constants.ts
 const PLAN_DATA_BEGIN = "===BEGIN PLAN DATA===";
 const PLAN_DATA_END = "===END PLAN DATA===";
+const PLAN_CLOSED_MARKER = "<!-- pwf: closed -->";
 const CACHE_SAFE_REMINDER = "[planning-with-files] Read task_plan.md for current phase and status. Read findings.md for research context. Read progress.md for recent changes. Continue from the current phase.";
 const POST_WRITE_REMINDER = "[planning-with-files] Update progress.md with what you just did. If a phase is now complete, update task_plan.md status.";
 const TAMPERED_PREFIX = "[planning-with-files] [PLAN TAMPERED - injection blocked]";
@@ -447,6 +448,10 @@ function clearExecution(state, sessionId, status) {
 function clearSessionApprovals(state, sessionId) {
 	for (const key of state.executionApprovedBySessionPlan) if (key.startsWith(`${sessionId}:`)) state.executionApprovedBySessionPlan.delete(key);
 }
+function clearPlanApprovals(state, status) {
+	const suffix = `:${status.planPath ?? "none"}`;
+	for (const key of state.executionApprovedBySessionPlan) if (key.endsWith(suffix)) state.executionApprovedBySessionPlan.delete(key);
+}
 function clearSessionAutoContinue(state, sessionId) {
 	for (const key of state.autoContinueBySessionPlan.keys()) if (key.startsWith(`${sessionId}:`)) state.autoContinueBySessionPlan.delete(key);
 }
@@ -454,6 +459,56 @@ function clearSessionLoop(state, sessionId) {
 	const timer = state.loopTimersBySession.get(sessionId);
 	if (timer) clearInterval(timer);
 	state.loopTimersBySession.delete(sessionId);
+}
+// src/lib/close.ts
+function handlePlanClose(commandArguments, context) {
+	const status = readPlanStatus(context.state.cwd);
+	const notice = selectionErrorNotice(status);
+	if (notice) {
+		context.notify("warn", notice);
+		return { action: "noop" };
+	}
+	if (!status.exists || !status.planPath) {
+		context.notify("warn", "No active plan (task_plan.md not found)");
+		return { action: "noop" };
+	}
+	const normalized = commandArguments.trim().toLowerCase();
+	const isReopen = [
+		"clear",
+		"open",
+		"reopen"
+	].includes(normalized);
+	const content = readFileSync(status.planPath, "utf8");
+	const closedPattern = /<!--\s*pwf:\s*closed\s*-->/i;
+	if (isReopen) {
+		if (!closedPattern.test(content)) {
+			context.notify("info", `Plan is already open: ${status.planPath}`);
+			return { action: "noop" };
+		}
+		const next = content.replaceAll(/\n?<!--\s*pwf:\s*closed\s*-->\n?/gi, "\n");
+		writeFileSync(status.planPath, next, "utf8");
+		clearPlanApprovals(context.state, status);
+		clearSessionLoop(context.state, context.state.sessionId);
+		context.notify("info", `Plan reopened: ${status.planPath}\nRun /plan-attest and /plan-execute to approve it again.`);
+		return { action: "noop" };
+	}
+	if (closedPattern.test(content)) {
+		context.notify("info", `Plan is already closed: ${status.planPath}`);
+		return { action: "noop" };
+	}
+	const separator = content.endsWith("\n") ? "\n" : "\n\n";
+	writeFileSync(status.planPath, `${content}${separator}${PLAN_CLOSED_MARKER}\n`, "utf8");
+	clearPlanApprovals(context.state, status);
+	clearSessionLoop(context.state, context.state.sessionId);
+	const removed = clearPlanAttestation(status);
+	context.notify("info", [
+		`Plan closed: ${summarizePlan(status)}`,
+		`Plan path: ${status.planPath}`,
+		"Execution approval cleared. Auto-continue stopped.",
+		removed.length > 0 ? "Attestation cleared because the closed marker changed the plan bytes." : "",
+		"Run /plan-close clear to reopen."
+	].filter(Boolean).join("\n"));
+	return { action: "noop" };
 }
 // src/lib/pwf.ts
 function handlePwf(commandArguments) {
@@ -500,7 +555,8 @@ function handlePwfStatus(context) {
 			`Scope: ${status.scope}`,
 			`Mode: ${mode}`,
 			`Attestation: ${attestation.enabled ? attestation.tampered ? "TAMPERED" : "valid" : "not recorded"}`,
-			`Execution: ${isApproved ? "active" : "passive (run /plan-execute)"}`,
+			`Closed: ${status.isClosed ? "yes" : "no"}`,
+			`Execution: ${status.isClosed ? "closed" : isApproved ? "active" : "passive (run /plan-execute)"}`,
 			`Current: ${currentPhaseName(status)}`,
 			`Phases: ${status.completePhases}/${status.totalPhases} complete, ${status.inProgressPhases} in progress, ${status.pendingPhases} pending, ${status.blockedPhases} blocked`
 		].join("\n")
@@ -546,6 +602,7 @@ function handleCommand(name, commandArguments, context) {
 	switch (name) {
 		case "plan-status": return handlePlanStatus(context);
 		case "plan-attest": return handlePlanAttest(commandArguments, context);
+		case "plan-close": return handlePlanClose(commandArguments, context);
 		case "plan-execute": return handlePlanExecute(commandArguments, context);
 		case "plan-goal": return handlePlanGoal(commandArguments, context);
 		case "plan-loop": return handlePlanLoop(commandArguments, context);
@@ -578,7 +635,8 @@ function handlePlanStatus(context) {
 			`Pending: ${status.pendingPhases}`,
 			`Blocked: ${status.blockedPhases}`,
 			`Attestation: ${attestation.enabled ? attestation.tampered ? "TAMPERED" : "valid" : "not recorded"}`,
-			`Execution: ${isApproved ? "active" : "passive (run /plan-execute)"}`
+			`Closed: ${status.isClosed ? "yes" : "no"}`,
+			`Execution: ${status.isClosed ? "closed" : isApproved ? "active" : "passive (run /plan-execute)"}`
 		].join("\n")
 	};
 }
@@ -608,6 +666,10 @@ function handlePlanAttest(commandArguments, context) {
 	if (!status.exists || !status.planPath) return {
 		action: "noop",
 		error: "[plan-attest] No task_plan.md found. Create a plan first."
+	};
+	if (mode === "attest" && status.isClosed) return {
+		action: "noop",
+		error: "[plan-attest] Plan is closed. Run /plan-close clear before attesting it again."
 	};
 	if (mode === "show") {
 		const attestation = checkPlanAttestation(status);
@@ -668,6 +730,10 @@ function handlePlanExecute(commandArguments, context) {
 	].includes(normalized)) {
 		clearExecution(context.state, context.state.sessionId, status);
 		context.notify("info", `Plan execution approval cleared: ${summarizePlan(status)}`);
+		return { action: "noop" };
+	}
+	if (status.isClosed) {
+		context.notify("warn", "Plan is closed. Run /plan-close clear to reopen it.");
 		return { action: "noop" };
 	}
 	if (checkPlanAttestation(status).tampered) {
@@ -811,6 +877,10 @@ function onSessionStart(context) {
 		context.notify("warn", "[planning-with-files] session not attached to planning context", true);
 		return;
 	}
+	if (status.isClosed) {
+		context.notify("info", `${summarizePlan(status)} - plan closed`, true);
+		return;
+	}
 	context.notify("info", `${summarizePlan(status)} - run /plan-execute to activate hooks`, true);
 }
 function onSessionEnd(context) {
@@ -883,12 +953,12 @@ function onToolCall(frame, context) {
 function onToolResult(frame, context) {
 	if (frame.tool_name !== "write" && frame.tool_name !== "edit") return;
 	const status = readPlanStatus(context.state.cwd);
-	if (!status.exists || !isExecutionApproved(context.state, context.state.sessionId, status)) return;
+	if (!status.exists || status.isClosed || !isExecutionApproved(context.state, context.state.sessionId, status)) return;
 	context.notify("info", POST_WRITE_REMINDER);
 }
 function onPreCompact(context) {
 	const status = readPlanStatus(context.state.cwd);
-	if (!status.exists) return;
+	if (!status.exists || status.isClosed) return;
 	const attestation = checkPlanAttestation(status);
 	const reminder = [
 		"[planning-with-files] PreCompact: context compaction is about to occur.",
@@ -909,7 +979,7 @@ function handleBeforeAgentStart(frame, context) {
 	const status = readPlanStatus(state.cwd);
 	const notice = selectionErrorNotice(status);
 	if (notice) return appendBlock(frame.system_prompt, notice);
-	if (!status.exists || !isSessionAttached(status.cwd, state.sessionId) || !isExecutionApproved(state, state.sessionId, status)) return;
+	if (!status.exists || status.isClosed || !isSessionAttached(status.cwd, state.sessionId) || !isExecutionApproved(state, state.sessionId, status)) return;
 	if (checkPlanAttestation(status).tampered) return appendBlock(frame.system_prompt, buildTamperMessage(status));
 	const mode = deriveEffectiveMode(resolveConfiguredMode(status.cwd), state.host);
 	if (mode === "notify") return void 0;
@@ -927,6 +997,10 @@ const COMMANDS = [
 	{
 		name: "plan-attest",
 		description: "manage the plan SHA-256 attestation (--show / --clear / --target)"
+	},
+	{
+		name: "plan-close",
+		description: "close the active plan or reopen it with clear"
 	},
 	{
 		name: "plan-execute",

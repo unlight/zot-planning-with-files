@@ -13,6 +13,7 @@ import {
   DEFAULT_LOOP_INTERVAL_MS,
   DEFAULT_LOOP_PROMPT,
 } from './constants.ts';
+import { handlePlanClose } from './close.ts';
 import {
   buildTamperMessage,
   selectionErrorNotice,
@@ -82,6 +83,9 @@ export function handleCommand(
     case 'plan-attest': {
       return handlePlanAttest(commandArguments, context);
     }
+    case 'plan-close': {
+      return handlePlanClose(commandArguments, context);
+    }
     case 'plan-execute': {
       return handlePlanExecute(commandArguments, context);
     }
@@ -127,7 +131,8 @@ function handlePlanStatus(context: ProtocolContext): CommandResponse {
     `Pending: ${status.pendingPhases}`,
     `Blocked: ${status.blockedPhases}`,
     `Attestation: ${attestation.enabled ? (attestation.tampered ? 'TAMPERED' : 'valid') : 'not recorded'}`,
-    `Execution: ${isApproved ? 'active' : 'passive (run /plan-execute)'}`,
+    `Closed: ${status.isClosed ? 'yes' : 'no'}`,
+    `Execution: ${status.isClosed ? 'closed' : isApproved ? 'active' : 'passive (run /plan-execute)'}`,
   ];
   return { action: 'display', display: lines.join('\n') };
 }
@@ -182,6 +187,14 @@ function handlePlanAttest(
     return {
       action: 'noop',
       error: '[plan-attest] No task_plan.md found. Create a plan first.',
+    };
+  }
+
+  if (mode === 'attest' && status.isClosed) {
+    return {
+      action: 'noop',
+      error:
+        '[plan-attest] Plan is closed. Run /plan-close clear before attesting it again.',
     };
   }
 
@@ -255,6 +268,14 @@ function handlePlanExecute(
     context.notify(
       'info',
       `Plan execution approval cleared: ${summarizePlan(status)}`,
+    );
+    return { action: 'noop' };
+  }
+
+  if (status.isClosed) {
+    context.notify(
+      'warn',
+      'Plan is closed. Run /plan-close clear to reopen it.',
     );
     return { action: 'noop' };
   }

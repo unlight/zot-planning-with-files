@@ -78,7 +78,8 @@ export function handlePwfStatus(context: ProtocolContext): CommandResponse {
     `Scope: ${status.scope}`,
     `Mode: ${mode}`,
     `Attestation: ${attestation.enabled ? (attestation.tampered ? 'TAMPERED' : 'valid') : 'not recorded'}`,
-    `Execution: ${isApproved ? 'active' : 'passive (run /plan-execute)'}`,
+    `Closed: ${status.isClosed ? 'yes' : 'no'}`,
+    `Execution: ${status.isClosed ? 'closed' : isApproved ? 'active' : 'passive (run /plan-execute)'}`,
     `Current: ${currentPhaseName(status)}`,
     `Phases: ${status.completePhases}/${status.totalPhases} complete, ${status.inProgressPhases} in progress, ${status.pendingPhases} pending, ${status.blockedPhases} blocked`,
   ];

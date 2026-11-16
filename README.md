@@ -159,10 +159,22 @@ and reports:
 [planning-with-files] ALL PHASES COMPLETE
 ```
 
-Return the plan to passive review with:
+Close the plan with:
 
 ```text
-/plan-execute reset
+/plan-close
+```
+
+This appends `<!-- pwf: closed -->`, clears execution approval, and clears the
+attestation because the marker changes the plan bytes. Use `/plan-execute reset`
+when you only want to stop hooks without closing the plan.
+
+To reopen a closed plan:
+
+```text
+/plan-close clear
+/plan-attest
+/plan-execute
 ```
 
 ### 7. Resume after a restart
@@ -196,6 +208,8 @@ and the
 | `/plan-attest --clear`              | none                | Remove the attestation and reopen the plan for editing.                                            |
 | `/plan-attest --target root`        | none                | Attest the legacy root `task_plan.md` explicitly.                                                  |
 | `/plan-attest --target <plan-id>`   | plan ID             | Attest one named plan explicitly.                                                                  |
+| `/plan-close`                       | none                | Append `<!-- pwf: closed -->`, clear execution approval, and stop auto-continue.                   |
+| `/plan-close clear`                 | none                | Remove the closed marker and reopen the plan for attestation and execution.                        |
 | `/plan-execute`                     | none                | Approve the selected plan for this session and activate hooks. Refuses a tampered plan.            |
 | `/plan-execute reset`               | none                | Return the selected plan to passive review mode.                                                   |
 | `/plan-goal <text>`                 | goal text           | Set the continuation goal appended to auto-continue prompts.                                       |
@@ -298,6 +312,22 @@ are waiting on a human decision.
 `blocked` is a zot extension status. The upstream `check-complete.sh` validator
 only accepts `pending`, `in_progress`, and `complete`.
 
+### Closing a plan
+
+`/plan-close` appends the closed marker to `task_plan.md`:
+
+```markdown
+<!-- pwf: closed -->
+```
+
+It also clears execution approval for every session and stops auto-continue.
+Because the marker changes the plan bytes, the command clears the attestation as
+well. Reopen the plan with `/plan-close clear`, then run `/plan-attest` and
+`/plan-execute` again.
+
+Closing does not delete the planning files. Use a new plan for the next task
+instead of reopening a completed plan.
+
 ## Lifecycle behavior
 
 The extension uses the lifecycle events and interception points zot provides:
@@ -348,6 +378,7 @@ src/lib/types.ts                        shared protocol and plan types
 src/lib/constants.ts                    shared strings and limits
 src/lib/plan.ts                         plan selection and status parsing
 src/lib/attestation.ts                  SHA-256 attestation
+src/lib/close.ts                        /plan-close handler
 src/lib/runtime.ts                      mode resolution and injection text
 src/lib/state.ts                        per-session state
 src/lib/commands.ts                     command handlers

@@ -64,6 +64,16 @@ export function clearSessionApprovals(
   }
 }
 
+export function clearPlanApprovals(
+  state: RuntimeState,
+  status: PlanStatus,
+): void {
+  const suffix = `:${status.planPath ?? 'none'}`;
+  for (const key of state.executionApprovedBySessionPlan) {
+    if (key.endsWith(suffix)) state.executionApprovedBySessionPlan.delete(key);
+  }
+}
+
 export function clearSessionAutoContinue(
   state: RuntimeState,
   sessionId: string,

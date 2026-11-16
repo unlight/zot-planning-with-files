@@ -1,6 +1,7 @@
 export const PKG_NAME = 'planning-with-files';
 export const PLAN_DATA_BEGIN = '===BEGIN PLAN DATA===';
 export const PLAN_DATA_END = '===END PLAN DATA===';
+export const PLAN_CLOSED_MARKER = '<!-- pwf: closed -->';
 
 // Keep this reminder stable so DeepSeek-style KV caches keep their prefix.
 export const CACHE_SAFE_REMINDER =
