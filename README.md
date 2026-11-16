@@ -66,6 +66,122 @@ adds plan status, attestation, execution approval, goal, and loop commands.
 The plan stays passive until `/plan-execute`. Passive means no plan text is
 injected into model context. Review and edit the plan before approving it.
 
+## Typical workflow
+
+A small feature is enough to show the full loop. This assumes the upstream
+skill is installed as shown in Quick start. The example uses a project-root
+plan; parallel tasks can keep the same three files under `.planning/<slug>/`.
+
+### 1. Start the plan
+
+```text
+/pwf Build a Python CLI todo app with add, list, and delete commands.
+```
+
+The extension loads the upstream `planning-with-files` skill and passes the
+task to it. The model creates:
+
+```text
+task_plan.md
+findings.md
+progress.md
+```
+
+Review `task_plan.md` before approving it. Edit the phases, scope, and
+completion criteria now. The plan stays passive and is not injected into model
+context until `/plan-execute`.
+
+### 2. Inspect and lock the plan
+
+```text
+/plan-status
+/plan-attest
+```
+
+`/plan-status` shows the selected plan, scope, phase counts, attestation state,
+and whether execution is active. `/plan-attest` records the SHA-256 of the
+current `task_plan.md`. If you edit the plan afterwards, run `/plan-attest`
+again; a changed plan is refused at injection and by `/plan-execute`.
+
+### 3. Approve execution
+
+```text
+/plan-execute
+```
+
+This activates plan injection, post-write reminders, and auto-continue for the
+current session. Approval is session-scoped and is cleared when the session
+ends.
+
+### 4. Work the plan
+
+Ask the model to execute the current phase, or tell it to continue. The model
+updates `progress.md`, marks phase status in `task_plan.md`, and proceeds. After
+a terminal turn, the extension submits a continuation prompt while phases remain
+incomplete, up to three times per user prompt.
+
+Optional goal text appended to auto-continue prompts:
+
+```text
+/plan-goal all tests pass and the CLI handles add, list, and delete
+```
+
+Optional periodic tick for a long run:
+
+```text
+/plan-loop
+```
+
+Stop the tick with:
+
+```text
+/plan-loop stop
+```
+
+### 5. Check progress
+
+```text
+/pwf-status
+```
+
+`/pwf-status` prints a compact block with the plan, scope, mode, attestation,
+execution state, current phase, and phase counts. `/plan-status` prints the same
+information with more detail.
+
+### 6. Finish and reset
+
+When every phase has `**Status:** complete`, the extension stops auto-continue
+and reports:
+
+```text
+[planning-with-files] ALL PHASES COMPLETE
+```
+
+Return the plan to passive review with:
+
+```text
+/plan-execute reset
+```
+
+### 7. Resume after a restart
+
+Execution approval does not survive a restart. On a new session, inspect the
+plan and approve it again:
+
+```text
+/plan-status
+/plan-execute
+```
+
+The three files on disk are the source of truth. The model re-reads them and
+continues from the current phase.
+
+For upstream walkthroughs, see the
+[upstream quickstart](https://github.com/OthmanAdi/planning-with-files/blob/master/docs/quickstart.md),
+[workflow guide](https://github.com/OthmanAdi/planning-with-files/blob/master/docs/workflow.md),
+and the
+[todo-app example](https://github.com/OthmanAdi/planning-with-files/blob/master/examples/README.md).
+
 ## Commands
 
 | Command                             | Arguments           | Behavior                                                                                           |
