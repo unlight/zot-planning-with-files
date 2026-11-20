@@ -803,19 +803,6 @@ function handlePlanLoop(commandArguments, context) {
 	return { action: "noop" };
 }
 // src/lib/hooks.ts
-const DANGEROUS_BASH_PATTERNS = [
-	/\brm\s+-[a-z]*r[a-z]*f\b/i,
-	/\bsudo\b/i,
-	/\bchmod\s+(0?777|a\+rwx)\b/i,
-	/\bgit\s+push\s+.*(--force|-f\b|--mirror|\+)/i,
-	/\bgit\s+reset\s+--hard\b/i,
-	/\bgit\s+clean\s+-[a-z]*[fdx]/i,
-	/:\s*\(\s*\)\s*\{.*\}\s*;\s*:/,
-	/\bdd\s+.*of=\/dev\/[sh]d[a-z]/i
-];
-function isDangerousBashCommand(command) {
-	return DANGEROUS_BASH_PATTERNS.some((pattern) => pattern.test(command));
-}
 function isToolUseStop(stop) {
 	return /tool/i.test(stop || "");
 }
@@ -946,9 +933,6 @@ function onToolCall(frame, context) {
 	const status = readPlanStatus(context.state.cwd);
 	const toolName = frame.tool_name || "";
 	if (!status.exists && !status.selectionError && (toolName === "write" || toolName === "edit")) context.notify("warn", "[planning-with-files] No task_plan.md found. Create planning files first.");
-	if (toolName !== "bash") return;
-	const toolArguments = frame.tool_args ?? {};
-	if (isDangerousBashCommand(typeof toolArguments.command === "string" ? toolArguments.command : "")) context.notify("warn", "[planning-with-files] Dangerous command detected. Review current phase in task_plan.md before approval.");
 }
 function onToolResult(frame, context) {
 	if (frame.tool_name !== "write" && frame.tool_name !== "edit") return;

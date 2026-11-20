@@ -344,7 +344,6 @@ The extension uses the lifecycle events and interception points zot provides:
 The extension also:
 
 - warns when `write` or `edit` runs without a `task_plan.md`;
-- warns on dangerous bash patterns before approval;
 - resets the auto-continue budget when the user submits a new prompt;
 - clears execution approval on session start and session end.
 

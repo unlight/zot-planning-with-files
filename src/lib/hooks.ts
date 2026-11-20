@@ -34,21 +34,6 @@ import type {
   RuntimeState,
 } from './types.ts';
 
-const DANGEROUS_BASH_PATTERNS: RegExp[] = [
-  /\brm\s+-[a-z]*r[a-z]*f\b/i,
-  /\bsudo\b/i,
-  /\bchmod\s+(0?777|a\+rwx)\b/i,
-  /\bgit\s+push\s+.*(--force|-f\b|--mirror|\+)/i,
-  /\bgit\s+reset\s+--hard\b/i,
-  /\bgit\s+clean\s+-[a-z]*[fdx]/i,
-  /:\s*\(\s*\)\s*\{.*\}\s*;\s*:/,
-  /\bdd\s+.*of=\/dev\/[sh]d[a-z]/i,
-];
-
-function isDangerousBashCommand(command: string): boolean {
-  return DANGEROUS_BASH_PATTERNS.some(pattern => pattern.test(command));
-}
-
 function isToolUseStop(stop: string | undefined): boolean {
   return /tool/i.test(stop || '');
 }
@@ -259,18 +244,6 @@ function onToolCall(frame: EventFrame, context: ProtocolContext): void {
     context.notify(
       'warn',
       '[planning-with-files] No task_plan.md found. Create planning files first.',
-    );
-  }
-
-  if (toolName !== 'bash') return;
-
-  const toolArguments: Record<string, unknown> = frame.tool_args ?? {};
-  const command =
-    typeof toolArguments.command === 'string' ? toolArguments.command : '';
-  if (isDangerousBashCommand(command)) {
-    context.notify(
-      'warn',
-      '[planning-with-files] Dangerous command detected. Review current phase in task_plan.md before approval.',
     );
   }
 }
