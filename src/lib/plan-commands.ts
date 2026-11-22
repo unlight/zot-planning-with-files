@@ -1,4 +1,3 @@
-import { existsSync } from 'node:fs';
 import { readCurrentBranch } from './branch.ts';
 import {
   bindPlanToBranch,
@@ -54,14 +53,13 @@ export function handlePlanUse(
     };
   }
 
-  if (!paths.planPath || !existsSync(paths.planPath)) {
+  const status = readPlanStatus(context.state.cwd, paths);
+  if (!status.exists) {
     return {
       action: 'noop',
       error: `[plan-use] ${target} does not contain task_plan.md. Nothing was selected.`,
     };
   }
-
-  const status = readPlanStatus(context.state.cwd, paths);
 
   const branch = readCurrentBranch(context.state.cwd);
   const previousBranch = paths.branch;

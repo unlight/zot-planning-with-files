@@ -357,7 +357,7 @@ function readPlanStatus(cwd, pathsOverride) {
 	if (paths.progressPath && existsSync(paths.progressPath)) progressTail20 = normalizeWallClock(safeRead(paths.progressPath).replaceAll("\r\n", "\n").split("\n").slice(-20).join("\n"));
 	return {
 		...paths,
-		exists: true,
+		exists: planBytes !== void 0,
 		planSha256,
 		attestationPath,
 		isClosed,
@@ -478,11 +478,11 @@ function handlePlanUse(commandArguments, context) {
 		action: "noop",
 		error: `[plan-use] ${target} did not resolve to a plan. Nothing was selected.`
 	};
-	if (!paths.planPath || !existsSync(paths.planPath)) return {
+	const status = readPlanStatus(context.state.cwd, paths);
+	if (!status.exists) return {
 		action: "noop",
 		error: `[plan-use] ${target} does not contain task_plan.md. Nothing was selected.`
 	};
-	const status = readPlanStatus(context.state.cwd, paths);
 	const branch = readCurrentBranch(context.state.cwd);
 	const previousBranch = paths.branch;
 	if (branch) bindPlanToBranch(paths, branch);

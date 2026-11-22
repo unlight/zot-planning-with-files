@@ -138,7 +138,7 @@ export function readPlanStatus(
 
   return {
     ...paths,
-    exists: true,
+    exists: planBytes !== undefined,
     planSha256,
     attestationPath,
     isClosed,
