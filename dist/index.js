@@ -772,7 +772,14 @@ function handlePlanUse(commandArguments, context) {
 // src/lib/close.ts
 function writePlanAtomically(planPath, content) {
 	const temporaryPath = `${planPath}.pwf-${process.pid}-${Date.now()}.tmp`;
-	writeFileSync(temporaryPath, content, "utf8");
+	let mode = 438;
+	try {
+		mode = statSync(planPath).mode & 511;
+	} catch {}
+	writeFileSync(temporaryPath, content, {
+		encoding: "utf8",
+		mode
+	});
 	try {
 		renameSync(temporaryPath, planPath);
 	} catch (error) {

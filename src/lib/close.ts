@@ -1,4 +1,10 @@
-import { readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
+import {
+  readFileSync,
+  renameSync,
+  statSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { clearPlanAttestation } from './attestation.ts';
 import { PLAN_CLOSED_MARKER } from './constants.ts';
 import { readPlanStatus } from './plan.ts';
@@ -8,7 +14,13 @@ import type { CommandResponse, ProtocolContext } from './types.ts';
 
 function writePlanAtomically(planPath: string, content: string): void {
   const temporaryPath = `${planPath}.pwf-${process.pid}-${Date.now()}.tmp`;
-  writeFileSync(temporaryPath, content, 'utf8');
+  let mode = 0o666;
+  try {
+    mode = statSync(planPath).mode & 0o777;
+  } catch {
+    // Keep the default mode when the original file is unreadable.
+  }
+  writeFileSync(temporaryPath, content, { encoding: 'utf8', mode });
   try {
     renameSync(temporaryPath, planPath);
   } catch (error) {
