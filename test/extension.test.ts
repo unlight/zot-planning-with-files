@@ -1035,6 +1035,14 @@ test('multiple matching plans require /plan-use', async t => {
   assert.match(warning.message ?? '', /alpha \(branch: feature\/a\)/);
   assert.match(warning.message ?? '', /beta \(branch: feature\/a\)/);
 
+  const viewed = await session.command('plan-status', 'alpha');
+  assert.match(viewed.display ?? '', /View: alpha \(read-only\)/);
+  assert.match(viewed.display ?? '', /\.planning\/alpha\/task_plan\.md/);
+  const viewedTarget = await session.command('plan-status', '--target beta');
+  assert.match(viewedTarget.display ?? '', /View: beta \(read-only\)/);
+  assert.match(viewedTarget.display ?? '', /\.planning\/beta\/task_plan\.md/);
+  assert.equal(existsSync(join(project, '.planning', '.active_plan')), false);
+
   const selected = await session.command('plan-use', 'alpha');
   assert.equal(selected.action, 'noop');
   await session.frames.next(

@@ -3,7 +3,11 @@ import {
   readPlanStatus,
   resolvePlanPathsForTarget,
 } from './plan.ts';
-import { handlePlanList, handlePlanUse } from './plan-commands.ts';
+import {
+  handlePlanList,
+  handlePlanStatus,
+  handlePlanUse,
+} from './plan-commands.ts';
 import {
   checkPlanAttestation,
   clearPlanAttestation,
@@ -17,7 +21,6 @@ import {
 import { handlePlanClose } from './close.ts';
 import {
   buildTamperMessage,
-  logSelection,
   selectionErrorNotice,
   summarizePlan,
 } from './runtime.ts';
@@ -26,7 +29,6 @@ import {
   approveExecution,
   clearExecution,
   clearSessionLoop,
-  isExecutionApproved,
   syncBranch,
 } from './state.ts';
 import type { CommandResponse, PlanStatus, ProtocolContext } from './types.ts';
@@ -84,7 +86,7 @@ export function handleCommand(
 
   switch (name) {
     case 'plan-status': {
-      return handlePlanStatus(context);
+      return handlePlanStatus(commandArguments, context);
     }
     case 'plan-attest': {
       return handlePlanAttest(commandArguments, context);
@@ -117,41 +119,6 @@ export function handleCommand(
       return { action: 'noop', error: `unknown command /${name}` };
     }
   }
-}
-
-function handlePlanStatus(context: ProtocolContext): CommandResponse {
-  const status = readPlanStatus(context.state.cwd);
-  logSelection(context, status);
-  if (notifySelectionError(status, context.notify)) return { action: 'noop' };
-  if (!status.exists) {
-    context.notify('warn', 'No active plan (task_plan.md not found)');
-    return { action: 'noop' };
-  }
-
-  const attestation = checkPlanAttestation(status);
-  const isApproved = isExecutionApproved(
-    context.state,
-    context.state.sessionId,
-    status,
-  );
-  const lines: string[] = [
-    `Plan path: ${status.planPath}`,
-    `Scope: ${status.scope}`,
-    ...(status.planId ? [`Plan ID: ${status.planId}`] : []),
-    ...(status.currentBranch
-      ? [`Current branch: ${status.currentBranch}`]
-      : []),
-    ...(status.branch ? [`Plan branch: ${status.branch}`] : []),
-    `Phases: ${status.totalPhases}`,
-    `Complete: ${status.completePhases}`,
-    `In progress: ${status.inProgressPhases}`,
-    `Pending: ${status.pendingPhases}`,
-    `Blocked: ${status.blockedPhases}`,
-    `Attestation: ${attestation.enabled ? (attestation.tampered ? 'TAMPERED' : 'valid') : 'not recorded'}`,
-    `Closed: ${status.isClosed ? 'yes' : 'no'}`,
-    `Execution: ${status.isClosed ? 'closed' : isApproved ? 'active' : 'passive (run /plan-execute)'}`,
-  ];
-  return { action: 'display', display: lines.join('\n') };
 }
 
 function handlePlanAttest(

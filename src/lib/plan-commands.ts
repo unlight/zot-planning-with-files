@@ -1,4 +1,5 @@
 import { readCurrentBranch } from './branch.ts';
+import { checkPlanAttestation } from './attestation.ts';
 import {
   bindPlanToBranch,
   listPlanCandidates,
@@ -10,8 +11,91 @@ import {
   clearPlanApprovals,
   clearSessionAutoContinue,
   clearSessionLoop,
+  isExecutionApproved,
 } from './state.ts';
-import type { CommandResponse, ProtocolContext } from './types.ts';
+import { logSelection, selectionErrorNotice } from './runtime.ts';
+import type { CommandResponse, PlanStatus, ProtocolContext } from './types.ts';
+
+export function handlePlanStatus(
+  commandArguments: string,
+  context: ProtocolContext,
+): CommandResponse {
+  const raw = commandArguments.trim();
+  let target: string | undefined;
+  if (raw) {
+    const parts = raw.split(/\s+/);
+    if (parts.length === 1 && !parts[0]?.startsWith('-')) {
+      target = parts[0];
+    } else if (parts.length === 2 && parts[0] === '--target') {
+      target = parts[1];
+    } else if (parts.length === 1 && parts[0]?.startsWith('--target=')) {
+      target = parts[0].slice('--target='.length);
+    }
+  }
+  if (raw && !target) {
+    return {
+      action: 'noop',
+      error: 'usage: /plan-status [<slug|root>] [--target <slug|root>]',
+    };
+  }
+
+  let status: PlanStatus;
+  if (target) {
+    const paths = resolvePlanPathsForTarget(context.state.cwd, target);
+    if (!paths) {
+      return {
+        action: 'noop',
+        error: `[plan-status] ${target} did not resolve to a plan.`,
+      };
+    }
+    status = readPlanStatus(context.state.cwd, paths);
+    logSelection(context, status);
+    if (!status.exists) {
+      return {
+        action: 'noop',
+        error: `[plan-status] ${target} does not contain task_plan.md.`,
+      };
+    }
+  } else {
+    status = readPlanStatus(context.state.cwd);
+    logSelection(context, status);
+    const notice = selectionErrorNotice(status);
+    if (notice) {
+      context.notify('warn', notice);
+      return { action: 'noop' };
+    }
+    if (!status.exists) {
+      context.notify('warn', 'No active plan (task_plan.md not found)');
+      return { action: 'noop' };
+    }
+  }
+
+  const attestation = checkPlanAttestation(status);
+  const isApproved = isExecutionApproved(
+    context.state,
+    context.state.sessionId,
+    status,
+  );
+  const lines: string[] = [
+    ...(target ? [`View: ${target} (read-only)`] : []),
+    `Plan path: ${status.planPath}`,
+    `Scope: ${status.scope}`,
+    ...(status.planId ? [`Plan ID: ${status.planId}`] : []),
+    ...(status.currentBranch
+      ? [`Current branch: ${status.currentBranch}`]
+      : []),
+    ...(status.branch ? [`Plan branch: ${status.branch}`] : []),
+    `Phases: ${status.totalPhases}`,
+    `Complete: ${status.completePhases}`,
+    `In progress: ${status.inProgressPhases}`,
+    `Pending: ${status.pendingPhases}`,
+    `Blocked: ${status.blockedPhases}`,
+    `Attestation: ${attestation.enabled ? (attestation.tampered ? 'TAMPERED' : 'valid') : 'not recorded'}`,
+    `Closed: ${status.isClosed ? 'yes' : 'no'}`,
+    `Execution: ${status.isClosed ? 'closed' : isApproved ? 'active' : 'passive (run /plan-execute)'}`,
+  ];
+  return { action: 'display', display: lines.join('\n') };
+}
 
 export function handlePlanList(context: ProtocolContext): CommandResponse {
   const branch = readCurrentBranch(context.state.cwd);
