@@ -357,7 +357,7 @@ test('bundles the zot planning skill', () => {
     join(EXT_DIR, 'skills', 'planning-with-files', 'SKILL.md'),
     'utf8',
   );
-  assert.match(skill, /name: planning/);
+  assert.match(skill, /name: pwf/);
   assert.match(skill, /\/plan-close/);
   assert.match(skill, /\.branch/);
   assert.match(skill, /progress\.md/);
@@ -373,7 +373,7 @@ test('pwf aliases start the workflow and show status', async t => {
   assert.equal(started.action, 'tool_prompt');
   assert.equal(started.tool_name, 'skill');
   assert.deepEqual(started.tool_args, {
-    name: 'planning-with-files:planning',
+    name: 'planning-with-files:pwf',
   });
   assert.equal(started.prompt, 'ship the feature');
 

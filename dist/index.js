@@ -551,7 +551,7 @@ function syncBranch(state, cwd) {
 	return `[planning-with-files] Branch changed: ${previous} -> ${branch}. Execution approval cleared. Run /plan-execute for the current plan.`;
 }
 // src/lib/constants.ts
-const PLANNING_SKILL_NAME = "planning-with-files:planning";
+const PLANNING_SKILL_NAME = "planning-with-files:pwf";
 const PLAN_DATA_BEGIN = "===BEGIN PLAN DATA===";
 const PLAN_DATA_END = "===END PLAN DATA===";
 const PLAN_CLOSED_MARKER = "<!-- pwf: closed -->";

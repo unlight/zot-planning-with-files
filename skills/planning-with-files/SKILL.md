@@ -1,5 +1,5 @@
 ---
-name: planning
+name: pwf
 description: zot planning-with-files workflow for branch-aware plans, phase tracking, and explicit close.
 allowed-tools: [read, write, edit, bash]
 ---
