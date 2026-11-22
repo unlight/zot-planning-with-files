@@ -2,10 +2,6 @@
 *.log
 .DS_Store
 /.planning/
-/task_plan.md
-/findings.md
-/progress.md
 /.plan-attestation
-/.plan-branch
 *.sublime-project
 *.sublime-workspace

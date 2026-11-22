@@ -2,7 +2,6 @@
 // zot-specific event mapping and injection behavior adapted from docs/extensions.md.
 import {
   isAllPhasesComplete,
-  isSessionAttached,
   readPlanStatus,
   shouldAutoContinue,
 } from './plan.ts';
@@ -123,14 +122,6 @@ function onSessionStart(context: ProtocolContext): void {
     return;
   }
   if (!status.exists) return;
-  if (!isSessionAttached(status.cwd, state.sessionId)) {
-    context.notify(
-      'warn',
-      '[planning-with-files] session not attached to planning context',
-      true,
-    );
-    return;
-  }
   if (status.isClosed) {
     context.notify('info', `${summarizePlan(status)} - plan closed`, true);
     return;
@@ -328,7 +319,6 @@ export function handleBeforeAgentStart(
   if (
     !status.exists ||
     status.isClosed ||
-    !isSessionAttached(status.cwd, state.sessionId) ||
     !isExecutionApproved(state, state.sessionId, status)
   ) {
     return undefined;

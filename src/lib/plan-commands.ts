@@ -35,7 +35,7 @@ export function handlePlanStatus(
   if (raw && !target) {
     return {
       action: 'noop',
-      error: 'usage: /plan-status [<slug|root>] [--target <slug|root>]',
+      error: 'usage: /plan-status [<slug>] [--target <slug>]',
     };
   }
 
@@ -131,7 +131,7 @@ export function handlePlanUse(
 ): CommandResponse {
   const target = commandArguments.trim();
   if (!target) {
-    return { action: 'noop', error: 'usage: /plan-use <slug|root>' };
+    return { action: 'noop', error: 'usage: /plan-use <slug>' };
   }
 
   const paths = resolvePlanPathsForTarget(context.state.cwd, target);

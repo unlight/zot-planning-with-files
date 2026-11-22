@@ -66,8 +66,8 @@ injected into model context. Review and edit the plan before approving it.
 ## Typical workflow
 
 A small feature is enough to show the full loop. The extension supplies the
-bundled skill and hooks. The example uses a project-root plan; parallel tasks
-can keep the same three files under `.planning/<slug>/`.
+bundled skill and hooks. The example keeps the three files under
+`.planning/<slug>/`.
 
 ### 1. Start the plan
 
@@ -84,9 +84,9 @@ findings.md
 progress.md
 ```
 
-Review `task_plan.md` before approving it. Edit the phases, scope, and
-completion criteria now. The plan stays passive and is not injected into model
-context until `/plan-execute`.
+Review `.planning/<slug>/task_plan.md` before approving it. Edit the phases,
+scope, and completion criteria now. The plan stays passive and is not injected
+into model context until `/plan-execute`.
 
 ### 2. Inspect and lock the plan
 
@@ -195,42 +195,39 @@ and the
 
 ## Commands
 
-| Command                             | Arguments           | Behavior                                                                                                                               |
-| ----------------------------------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `/pwf [task]`                       | optional task       | Load the bundled `pwf:planning` skill and start the workflow.                                                                          |
-| `/pwf-status`                       | none                | Show a compact status block: plan, scope, mode, attestation, current phase, and phase counts.                                          |
-| `/plan-status`                      | none                | Show the selected plan path, scope, plan ID, phase counts, attestation state, and execution state.                                     |
-| `/plan-status <slug>`               | plan slug or `root` | Show one plan read-only without changing `.active_plan` or execution approval.                                                         |
-| `/plan-status --target <slug>`      | plan slug or `root` | Same as `/plan-status <slug>`.                                                                                                         |
-| `/plan-attest`                      | none                | Record the SHA-256 of `task_plan.md` in `.planning/<id>/.attestation` or `./.plan-attestation`.                                        |
-| `/plan-attest --show`               | none                | Print the stored hash, the current hash, and whether they match.                                                                       |
-| `/plan-attest --clear`              | none                | Remove the attestation and reopen the plan for editing.                                                                                |
-| `/plan-attest --target root`        | none                | Attest the legacy root `task_plan.md` explicitly.                                                                                      |
-| `/plan-attest --target <plan-id>`   | plan ID             | Attest one named plan explicitly.                                                                                                      |
-| `/plan-list`                        | none                | List live and archived plans with branch, closed state, phase counts, modification time, and state.                                    |
-| `/plan-use <slug>`                  | plan slug           | Select a plan, bind it to the current branch, write `.active_plan`, and clear execution approval. Use `root` for the legacy root plan. |
-| `/plan-close`                       | none                | Close a completed plan: append `<!-- pwf: closed -->`, clear approval, stop auto-continue.                                             |
-| `/plan-close --force`               | none                | Close an incomplete plan. Without it, an incomplete plan is refused.                                                                   |
-| `/plan-close clear`                 | none                | Remove the closed marker and reopen the plan for attestation and execution.                                                            |
-| `/plan-execute`                     | none                | Approve the selected plan for this session and activate hooks. Refuses a tampered plan.                                                |
-| `/plan-execute reset`               | none                | Return the selected plan to passive review mode.                                                                                       |
-| `/plan-goal <text>`                 | goal text           | Set the continuation goal appended to auto-continue prompts.                                                                           |
-| `/plan-goal default`                | none                | Use `all phases in task_plan.md report Status: complete`.                                                                              |
-| `/plan-goal clear`                  | none                | Clear the session goal.                                                                                                                |
-| `/plan-loop`                        | none                | Start the default 10 minute planning tick.                                                                                             |
-| `/plan-loop <interval>`             | `^\d+[smhd]$`       | Start a tick with a custom interval, for example `5m` or `1h`.                                                                         |
-| `/plan-loop <interval> <prompt...>` | interval and prompt | Start a tick with a custom prompt.                                                                                                     |
-| `/plan-loop stop`                   | none                | Stop the session loop.                                                                                                                 |
+| Command                             | Arguments           | Behavior                                                                                            |
+| ----------------------------------- | ------------------- | --------------------------------------------------------------------------------------------------- |
+| `/pwf [task]`                       | optional task       | Load the bundled `pwf:planning` skill and start the workflow.                                       |
+| `/pwf-status`                       | none                | Show a compact status block: plan, scope, mode, attestation, current phase, and phase counts.       |
+| `/plan-status`                      | none                | Show the selected plan path, scope, plan ID, phase counts, attestation state, and execution state.  |
+| `/plan-status <slug>`               | plan slug           | Show one plan read-only without changing `.active_plan` or execution approval.                      |
+| `/plan-status --target <slug>`      | plan slug           | Same as `/plan-status <slug>`.                                                                      |
+| `/plan-attest`                      | none                | Record the SHA-256 of `task_plan.md` in `.planning/<id>/.attestation` or `./.plan-attestation`.     |
+| `/plan-attest --show`               | none                | Print the stored hash, the current hash, and whether they match.                                    |
+| `/plan-attest --clear`              | none                | Remove the attestation and reopen the plan for editing.                                             |
+| `/plan-attest --target <plan-id>`   | plan ID             | Attest one named plan explicitly.                                                                   |
+| `/plan-list`                        | none                | List live and archived plans with branch, closed state, phase counts, modification time, and state. |
+| `/plan-use <slug>`                  | plan slug           | Select a plan, bind it to the current branch, write `.active_plan`, and clear execution approval.   |
+| `/plan-close`                       | none                | Close a completed plan: append `<!-- pwf: closed -->`, clear approval, stop auto-continue.          |
+| `/plan-close --force`               | none                | Close an incomplete plan. Without it, an incomplete plan is refused.                                |
+| `/plan-close clear`                 | none                | Remove the closed marker and reopen the plan for attestation and execution.                         |
+| `/plan-execute`                     | none                | Approve the selected plan for this session and activate hooks. Refuses a tampered plan.             |
+| `/plan-execute reset`               | none                | Return the selected plan to passive review mode.                                                    |
+| `/plan-goal <text>`                 | goal text           | Set the continuation goal appended to auto-continue prompts.                                        |
+| `/plan-goal default`                | none                | Use `all phases in task_plan.md report Status: complete`.                                           |
+| `/plan-goal clear`                  | none                | Clear the session goal.                                                                             |
+| `/plan-loop`                        | none                | Start the default 10 minute planning tick.                                                          |
+| `/plan-loop <interval>`             | `^\d+[smhd]$`       | Start a tick with a custom interval, for example `5m` or `1h`.                                      |
+| `/plan-loop <interval> <prompt...>` | interval and prompt | Start a tick with a custom prompt.                                                                  |
+| `/plan-loop stop`                   | none                | Stop the session loop.                                                                              |
 
-Most `/plan-*` names and argument forms follow the upstream `planning-with-files`
-command set. `/plan-list` and `/plan-use` are zot-specific branch selection
+Most `/plan-*` names are compatible with upstream `planning-with-files`. `/plan-list` and `/plan-use` are zot-specific branch selection
 commands. `/pwf` and `/pwf-status` are host-style aliases.
 
 ## Plan selection
 
 The extension starts from `hello_ack.cwd` and walks up to the nearest directory
-with `.planning/` or `task_plan.md`. The walk stops at `.git` or the filesystem
-root.
+with `.planning/`. The walk stops at `.git` or the filesystem root.
 
 Selection is branch-aware. The extension reads the current git branch from
 `.git/HEAD`, including linked worktrees where `.git` is a file.
@@ -255,8 +252,6 @@ Selection order:
 9. Plans under `.planning/.archive/<slug>/` are listed by `/plan-list` but are
    never selected. If archived plans exist and `.active_plan` is missing, the
    extension refuses selection until `/plan-use <slug>` writes a pointer.
-10. The legacy project-root `task_plan.md` is a candidate like any other plan,
-    with its branch stored in `./.plan-branch`.
 
 The extension no longer chooses the newest plan by mtime when more than one plan
 is available. That fallback caused plans, `progress.md`, and `findings.md` from
@@ -273,7 +268,6 @@ A plan can be bound to a branch explicitly:
 
 This writes `.planning/sposs-22191/.branch`, writes
 `.planning/.active_plan`, and clears execution approval for the current session.
-For a root plan, the sidecar is `./.plan-branch`.
 
 The branch sidecar is separate from `task_plan.md`, so it does not change the
 plan bytes or invalidate the attestation.
@@ -282,17 +276,8 @@ Keep planning state out of git when it is private:
 
 ```text
 .planning/
-task_plan.md
-progress.md
-findings.md
 .plan-attestation
-.plan-branch
 ```
-
-When `.planning/sessions/` exists, a session counts as attached only when
-`.planning/sessions/<session_id>.attached` exists. zot does not create
-attachment markers itself. Create them explicitly when you use session
-isolation.
 
 ### Parallel branches
 
@@ -558,8 +543,8 @@ npm run build
 
 **`No active plan (task_plan.md not found)`**
 
-Create `task_plan.md` in the project root or in `.planning/<slug>/`. Run
-`/plan-status` to see the path the extension resolved.
+Create `.planning/<slug>/task_plan.md`. Run `/plan-status` to see the path the
+extension resolved.
 
 **`Multiple plans are available for branch <branch>`**
 
@@ -600,8 +585,8 @@ bytes, or restore the file from git.
 
 **The plan is not injected**
 
-Check that `/plan-execute` was run in this session, that the mode is not
-`notify`, and that the session is attached when session isolation is armed.
+Check that `/plan-execute` was run in this session and that the mode is not
+`notify`.
 
 **Auto-continue or `/plan-loop` does nothing in print mode**
 

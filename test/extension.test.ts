@@ -100,14 +100,26 @@ interface Waiter {
   resolve: (frame: TestFrame) => void;
 }
 
+const TEST_SLUG = 'test';
+
+function planDirectory(projectDir: string): string {
+  return join(projectDir, '.planning', TEST_SLUG);
+}
+
+function planFile(projectDir: string): string {
+  return join(planDirectory(projectDir), 'task_plan.md');
+}
+
 function createProject({
   withPlan = true,
 }: { withPlan?: boolean } = {}): string {
   const dir = mkdtempSync(join(tmpdir(), 'zot-pwf-'));
   if (withPlan) {
-    writeFileSync(join(dir, 'task_plan.md'), PLAN);
-    writeFileSync(join(dir, 'findings.md'), '# Findings\n');
-    writeFileSync(join(dir, 'progress.md'), PROGRESS);
+    const directory = planDirectory(dir);
+    mkdirSync(directory, { recursive: true });
+    writeFileSync(join(directory, 'task_plan.md'), PLAN);
+    writeFileSync(join(directory, 'findings.md'), '# Findings\n');
+    writeFileSync(join(directory, 'progress.md'), PROGRESS);
   }
   return dir;
 }
@@ -331,7 +343,7 @@ test('logs plan selection and notifications', async t => {
 
   assert.match(
     session.stderr(),
-    /selection scope=root plan=none rule=single-candidate/,
+    /selection scope=scoped plan=test rule=single-candidate/,
   );
   assert.match(session.stderr(), /notify info startup:/);
 });
@@ -405,7 +417,7 @@ test('attestation lifecycle writes, verifies, and clears', async t => {
   assert.equal(attested.action, 'display');
   assert.match(attested.display ?? '', /Plan attested/);
 
-  const attestationPath = join(project, '.plan-attestation');
+  const attestationPath = join(planDirectory(project), '.attestation');
   assert.equal(existsSync(attestationPath), true);
   assert.match(readFileSync(attestationPath, 'utf8').trim(), /^[a-f0-9]{64}$/);
 
@@ -471,11 +483,11 @@ test('plan-close refuses an incomplete plan without --force', async t => {
   );
   assert.match(warning.message ?? '', /--force/);
   assert.doesNotMatch(
-    readFileSync(join(project, 'task_plan.md'), 'utf8'),
+    readFileSync(planFile(project), 'utf8'),
     /<!-- pwf: closed -->/,
   );
 
-  writeFileSync(join(project, 'task_plan.md'), COMPLETE_PLAN);
+  writeFileSync(planFile(project), COMPLETE_PLAN);
   await session.command('plan-close');
   await session.frames.next(
     frame =>
@@ -483,12 +495,11 @@ test('plan-close refuses an incomplete plan without --force', async t => {
       typeof frame.message === 'string' &&
       frame.message.includes('Plan closed'),
   );
-  assert.match(
-    readFileSync(join(project, 'task_plan.md'), 'utf8'),
-    /<!-- pwf: closed -->/,
-  );
+  assert.match(readFileSync(planFile(project), 'utf8'), /<!-- pwf: closed -->/);
   assert.equal(
-    readdirSync(project).some(name => name.startsWith('task_plan.md.pwf-')),
+    readdirSync(planDirectory(project)).some(name =>
+      name.startsWith('task_plan.md.pwf-'),
+    ),
     false,
   );
 });
@@ -518,10 +529,7 @@ test('plan-close closes the plan and reopens it', async t => {
       frame.message.includes('Plan closed'),
   );
   assert.match(closedNotify.message ?? '', /Execution approval cleared/);
-  assert.match(
-    readFileSync(join(project, 'task_plan.md'), 'utf8'),
-    /<!-- pwf: closed -->/,
-  );
+  assert.match(readFileSync(planFile(project), 'utf8'), /<!-- pwf: closed -->/);
 
   const closedStatus = await session.command('plan-status');
   assert.match(closedStatus.display ?? '', /Closed: yes/);
@@ -573,7 +581,7 @@ test('plan-close closes the plan and reopens it', async t => {
       frame.message.includes('Plan reopened'),
   );
   assert.doesNotMatch(
-    readFileSync(join(project, 'task_plan.md'), 'utf8'),
+    readFileSync(planFile(project), 'utf8'),
     /<!-- pwf: closed -->/,
   );
 
@@ -617,10 +625,7 @@ test('a changed plan is blocked from injection', async t => {
       frame.message.includes('Plan execution approved'),
   );
 
-  writeFileSync(
-    join(project, 'task_plan.md'),
-    PLAN.replace('in_progress', 'complete'),
-  );
+  writeFileSync(planFile(project), PLAN.replace('in_progress', 'complete'));
 
   session.send({
     type: 'event_intercept',
@@ -642,7 +647,7 @@ test('a changed plan is blocked from injection', async t => {
 test('reports all phases complete once and suggests /plan-close', async t => {
   const project = createProject();
   t.after(() => rmSync(project, { recursive: true, force: true }));
-  writeFileSync(join(project, 'task_plan.md'), COMPLETE_PLAN);
+  writeFileSync(planFile(project), COMPLETE_PLAN);
   const session = await startExtension(project);
   t.after(() => session.close());
 
@@ -760,7 +765,7 @@ test('turn_end does not auto-continue without an in_progress phase', async t => 
   const project = createProject();
   t.after(() => rmSync(project, { recursive: true, force: true }));
   writeFileSync(
-    join(project, 'task_plan.md'),
+    planFile(project),
     `# Task Plan: Test
 
 ## Phases
@@ -807,7 +812,7 @@ test('blocked phase is reported and does not auto-continue', async t => {
   const project = createProject();
   t.after(() => rmSync(project, { recursive: true, force: true }));
   writeFileSync(
-    join(project, 'task_plan.md'),
+    planFile(project),
     `# Task Plan: Test
 
 ## Phases
@@ -1098,7 +1103,7 @@ test('multiple matching plans require /plan-use', async t => {
 
   const missingRoot = await session.command('plan-use', 'root');
   assert.equal(missingRoot.action, 'noop');
-  assert.match(missingRoot.error ?? '', /does not contain task_plan\.md/);
+  assert.match(missingRoot.error ?? '', /did not resolve/);
 });
 
 test('refuses a plan bound to another branch', async t => {

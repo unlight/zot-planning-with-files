@@ -1,6 +1,5 @@
 import { createHash } from 'node:crypto';
 import { existsSync, lstatSync, readFileSync } from 'node:fs';
-import path from 'node:path';
 import { resolvePlanPaths } from './plan-select.ts';
 import type { PlanPaths, PlanStatus } from './types.ts';
 
@@ -43,23 +42,6 @@ export function normalizeWallClock(text: string): string {
       /T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?([+-][0-9]{2}:[0-9]{2})/g,
       'T00:00:00$2',
     );
-}
-
-function sessionIsolationState(cwd: string): 'absent' | 'armed' | 'invalid' {
-  try {
-    const sessions = lstatSync(path.join(cwd, '.planning', 'sessions'));
-    return sessions.isDirectory() && !sessions.isSymbolicLink()
-      ? 'armed'
-      : 'invalid';
-  } catch (error) {
-    return (error as NodeJS.ErrnoException).code === 'ENOENT'
-      ? 'absent'
-      : 'invalid';
-  }
-}
-
-function isSessionIsolationArmed(cwd: string): boolean {
-  return sessionIsolationState(cwd) === 'armed';
 }
 
 export function readPlanStatus(
@@ -121,13 +103,6 @@ export function readPlanStatus(
     else if (statusPending.test(line)) pendingPhases += 1;
     else if (statusBlocked.test(line)) blockedPhases += 1;
   }
-  if (completePhases + inProgressPhases + pendingPhases + blockedPhases === 0) {
-    completePhases = (planContent.match(/\[complete\]/gi) || []).length;
-    inProgressPhases = (planContent.match(/\[in_progress\]/gi) || []).length;
-    pendingPhases = (planContent.match(/\[pending\]/gi) || []).length;
-    blockedPhases = (planContent.match(/\[blocked\]/gi) || []).length;
-  }
-
   let progressTail20 = '';
   if (paths.progressPath && existsSync(paths.progressPath)) {
     const progressLines = safeRead(paths.progressPath)
@@ -168,14 +143,4 @@ export function shouldAutoContinue(status: PlanStatus): boolean {
     status.totalPhases > 0 &&
     status.inProgressPhases > 0
   );
-}
-
-export function isSessionAttached(
-  cwd: string,
-  sessionId: string | undefined,
-): boolean {
-  const sessionsDirectory = path.join(cwd, '.planning', 'sessions');
-  if (sessionIsolationState(cwd) === 'absent') return true;
-  if (!sessionId || !isSessionIsolationArmed(cwd)) return false;
-  return existsSync(path.join(sessionsDirectory, `${sessionId}.attached`));
 }

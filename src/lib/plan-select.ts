@@ -11,7 +11,6 @@ import {
   listArchivedCandidatesAt,
   listPlanCandidatesAt,
   makeNone,
-  makeRoot,
   makeScoped,
   readActivePlanId,
   resolveProjectRoot,
@@ -185,14 +184,16 @@ export function resolvePlanPathsForTarget(
   target: string,
 ): PlanPaths | undefined {
   const rootResult = resolveProjectRoot(sessionCwd);
-  if (rootResult.error) return undefined;
+  if (
+    !target ||
+    target === 'root' ||
+    !SLUG_RE.test(target) ||
+    rootResult.error
+  ) {
+    return undefined;
+  }
   const cwd = rootResult.cwd;
   const currentBranch = readCurrentBranch(cwd);
-
-  if (!target || target === 'root') {
-    return mark(withCurrentBranch(makeRoot(cwd), currentBranch), 'root-target');
-  }
-  if (!SLUG_RE.test(target)) return undefined;
 
   const candidate = path.join(cwd, '.planning', target);
   return existsSync(path.join(candidate, 'task_plan.md')) &&

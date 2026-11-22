@@ -46,10 +46,7 @@ export function isWithinRoot(root: string, candidate: string): boolean {
 export function resolveAnchor(cwd: string): string {
   let directory = cwd;
   for (let depth = 0; depth < ANCHOR_WALK_CAP; depth++) {
-    if (
-      existsSync(path.join(directory, '.planning')) ||
-      existsSync(path.join(directory, 'task_plan.md'))
-    ) {
+    if (existsSync(path.join(directory, '.planning'))) {
       return directory;
     }
     const parent = path.dirname(directory);
@@ -77,20 +74,6 @@ export function makeScoped(cwd: string, planDirectory: string): PlanPaths {
       path.join(planDirectory, '.attestation'),
       path.join(cwd, '.plan-attestation'),
     ],
-  };
-}
-
-export function makeRoot(cwd: string): PlanPaths {
-  const branchPath = path.join(cwd, '.plan-branch');
-  return {
-    cwd,
-    scope: 'root',
-    planPath: path.join(cwd, 'task_plan.md'),
-    progressPath: path.join(cwd, 'progress.md'),
-    findingsPath: path.join(cwd, 'findings.md'),
-    branchPath,
-    branch: readPlanBranch(branchPath),
-    attestationCandidates: [path.join(cwd, '.plan-attestation')],
   };
 }
 
@@ -150,7 +133,7 @@ export function setActivePlan(cwd: string, target: string): void {
 export function readActivePlanId(cwd: string): string | undefined {
   const value = safeRead(path.join(cwd, '.planning', '.active_plan')).trim();
   if (!value) return undefined;
-  return value === 'root' || SLUG_RE.test(value) ? value : undefined;
+  return SLUG_RE.test(value) ? value : undefined;
 }
 
 function planMtime(planPath: string): number {
@@ -164,16 +147,6 @@ function planMtime(planPath: string): number {
 export function listPlanCandidatesAt(cwd: string): PlanCandidate[] {
   const planRoot = path.join(cwd, '.planning');
   const candidates: PlanCandidate[] = [];
-
-  const rootPaths = makeRoot(cwd);
-  if (rootPaths.planPath && existsSync(rootPaths.planPath)) {
-    candidates.push({
-      slug: 'root',
-      paths: rootPaths,
-      branch: rootPaths.branch,
-      mtimeMs: planMtime(rootPaths.planPath),
-    });
-  }
 
   try {
     const entries = readdirSync(planRoot, { withFileTypes: true });

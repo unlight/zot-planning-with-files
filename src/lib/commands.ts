@@ -146,7 +146,7 @@ function handlePlanAttest(
   } else if (parts.length > 0) {
     return {
       action: 'noop',
-      error: 'usage: /plan-attest [--show|--clear|--target root|<plan-id>]',
+      error: 'usage: /plan-attest [--show|--clear|--target <plan-id>]',
     };
   }
 

@@ -78,7 +78,7 @@ function isWithinRoot(root, candidate) {
 function resolveAnchor(cwd) {
 	let directory = cwd;
 	for (let depth = 0; depth < ANCHOR_WALK_CAP; depth++) {
-		if (existsSync(path.join(directory, ".planning")) || existsSync(path.join(directory, "task_plan.md"))) return directory;
+		if (existsSync(path.join(directory, ".planning"))) return directory;
 		const parent = path.dirname(directory);
 		if (parent === directory || existsSync(path.join(directory, ".git"))) return cwd;
 		directory = parent;
@@ -98,19 +98,6 @@ function makeScoped(cwd, planDirectory) {
 		branchPath,
 		branch: readPlanBranch(branchPath),
 		attestationCandidates: [path.join(planDirectory, ".attestation"), path.join(cwd, ".plan-attestation")]
-	};
-}
-function makeRoot(cwd) {
-	const branchPath = path.join(cwd, ".plan-branch");
-	return {
-		cwd,
-		scope: "root",
-		planPath: path.join(cwd, "task_plan.md"),
-		progressPath: path.join(cwd, "progress.md"),
-		findingsPath: path.join(cwd, "findings.md"),
-		branchPath,
-		branch: readPlanBranch(branchPath),
-		attestationCandidates: [path.join(cwd, ".plan-attestation")]
 	};
 }
 function makeNone(cwd, selectionError, selectionErrorDetail) {
@@ -160,7 +147,7 @@ function setActivePlan(cwd, target) {
 function readActivePlanId(cwd) {
 	const value = safeRead$1(path.join(cwd, ".planning", ".active_plan")).trim();
 	if (!value) return void 0;
-	return value === "root" || SLUG_RE.test(value) ? value : void 0;
+	return SLUG_RE.test(value) ? value : void 0;
 }
 function planMtime(planPath) {
 	try {
@@ -172,13 +159,6 @@ function planMtime(planPath) {
 function listPlanCandidatesAt(cwd) {
 	const planRoot = path.join(cwd, ".planning");
 	const candidates = [];
-	const rootPaths = makeRoot(cwd);
-	if (rootPaths.planPath && existsSync(rootPaths.planPath)) candidates.push({
-		slug: "root",
-		paths: rootPaths,
-		branch: rootPaths.branch,
-		mtimeMs: planMtime(rootPaths.planPath)
-	});
 	try {
 		const entries = readdirSync(planRoot, { withFileTypes: true });
 		for (const entry of entries) {
@@ -305,11 +285,9 @@ function resolvePlanPaths(sessionCwd) {
 }
 function resolvePlanPathsForTarget(sessionCwd, target) {
 	const rootResult = resolveProjectRoot(sessionCwd);
-	if (rootResult.error) return void 0;
+	if (!target || target === "root" || !SLUG_RE.test(target) || rootResult.error) return;
 	const cwd = rootResult.cwd;
 	const currentBranch = readCurrentBranch(cwd);
-	if (!target || target === "root") return mark(withCurrentBranch(makeRoot(cwd), currentBranch), "root-target");
-	if (!SLUG_RE.test(target)) return void 0;
 	const candidate = path.join(cwd, ".planning", target);
 	return existsSync(path.join(candidate, "task_plan.md")) && isWithinRoot(cwd, candidate) ? mark(withCurrentBranch(makeScoped(cwd, candidate), currentBranch), "target") : void 0;
 }
@@ -331,17 +309,6 @@ function selectAttestationPath(candidates) {
 }
 function normalizeWallClock(text) {
 	return text.replaceAll(/T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?Z/g, "T00:00:00Z").replaceAll(/T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?([+-][0-9]{2}:[0-9]{2})/g, "T00:00:00$2");
-}
-function sessionIsolationState(cwd) {
-	try {
-		const sessions = lstatSync(path.join(cwd, ".planning", "sessions"));
-		return sessions.isDirectory() && !sessions.isSymbolicLink() ? "armed" : "invalid";
-	} catch (error) {
-		return error.code === "ENOENT" ? "absent" : "invalid";
-	}
-}
-function isSessionIsolationArmed(cwd) {
-	return sessionIsolationState(cwd) === "armed";
 }
 function readPlanStatus(cwd, pathsOverride) {
 	const paths = pathsOverride ?? resolvePlanPaths(cwd);
@@ -387,12 +354,6 @@ function readPlanStatus(cwd, pathsOverride) {
 		else if (statusPending.test(line)) pendingPhases += 1;
 		else if (statusBlocked.test(line)) blockedPhases += 1;
 	}
-	if (completePhases + inProgressPhases + pendingPhases + blockedPhases === 0) {
-		completePhases = (planContent.match(/\[complete\]/gi) || []).length;
-		inProgressPhases = (planContent.match(/\[in_progress\]/gi) || []).length;
-		pendingPhases = (planContent.match(/\[pending\]/gi) || []).length;
-		blockedPhases = (planContent.match(/\[blocked\]/gi) || []).length;
-	}
 	let progressTail20 = "";
 	if (paths.progressPath && existsSync(paths.progressPath)) progressTail20 = normalizeWallClock(safeRead(paths.progressPath).replaceAll("\r\n", "\n").split("\n").slice(-20).join("\n"));
 	return {
@@ -416,12 +377,6 @@ function isAllPhasesComplete(status) {
 }
 function shouldAutoContinue(status) {
 	return status.exists && !status.isClosed && status.totalPhases > 0 && status.inProgressPhases > 0;
-}
-function isSessionAttached(cwd, sessionId) {
-	const sessionsDirectory = path.join(cwd, ".planning", "sessions");
-	if (sessionIsolationState(cwd) === "absent") return true;
-	if (!sessionId || !isSessionIsolationArmed(cwd)) return false;
-	return existsSync(path.join(sessionsDirectory, `${sessionId}.attached`));
 }
 // src/lib/attestation.ts
 function normalizeHash(value) {
@@ -661,7 +616,7 @@ function handlePlanStatus(commandArguments, context) {
 	}
 	if (raw && !target) return {
 		action: "noop",
-		error: "usage: /plan-status [<slug|root>] [--target <slug|root>]"
+		error: "usage: /plan-status [<slug>] [--target <slug>]"
 	};
 	let status;
 	if (target) {
@@ -742,7 +697,7 @@ function handlePlanUse(commandArguments, context) {
 	const target = commandArguments.trim();
 	if (!target) return {
 		action: "noop",
-		error: "usage: /plan-use <slug|root>"
+		error: "usage: /plan-use <slug>"
 	};
 	const paths = resolvePlanPathsForTarget(context.state.cwd, target);
 	if (!paths) return {
@@ -901,7 +856,7 @@ function handlePwfStatus(context) {
 		action: "display",
 		display: [
 			"Planning status",
-			`Plan: ${status.planId ?? "root"} (${status.planPath})`,
+			`Plan: ${status.planId ?? "none"} (${status.planPath})`,
 			`Scope: ${status.scope}`,
 			...status.currentBranch ? [`Current branch: ${status.currentBranch}`] : [],
 			...status.branch ? [`Plan branch: ${status.branch}`] : [],
@@ -979,7 +934,7 @@ function handlePlanAttest(commandArguments, context) {
 	else if (parts.length === 2 && (parts[0] === "--target" || parts[0] === "-Target")) target = parts[1];
 	else if (parts.length > 0) return {
 		action: "noop",
-		error: "usage: /plan-attest [--show|--clear|--target root|<plan-id>]"
+		error: "usage: /plan-attest [--show|--clear|--target <plan-id>]"
 	};
 	let status;
 	if (target) {
@@ -1195,10 +1150,6 @@ function onSessionStart(context) {
 		return;
 	}
 	if (!status.exists) return;
-	if (!isSessionAttached(status.cwd, state.sessionId)) {
-		context.notify("warn", "[planning-with-files] session not attached to planning context", true);
-		return;
-	}
 	if (status.isClosed) {
 		context.notify("info", `${summarizePlan(status)} - plan closed`, true);
 		return;
@@ -1312,7 +1263,7 @@ function handleBeforeAgentStart(frame, context) {
 	logSelection(context, status);
 	const notice = selectionErrorNotice(status);
 	if (notice) return appendBlock(frame.system_prompt, notice);
-	if (!status.exists || status.isClosed || !isSessionAttached(status.cwd, state.sessionId) || !isExecutionApproved(state, state.sessionId, status)) return;
+	if (!status.exists || status.isClosed || !isExecutionApproved(state, state.sessionId, status)) return;
 	if (checkPlanAttestation(status).tampered) return appendBlock(frame.system_prompt, buildTamperMessage(status));
 	const mode = deriveEffectiveMode(resolveConfiguredMode(status.cwd), state.host);
 	if (mode === "notify") return void 0;

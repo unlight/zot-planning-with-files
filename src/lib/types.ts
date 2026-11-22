@@ -1,6 +1,6 @@
 export type HookMode = 'auto' | 'parity' | 'cache-safe' | 'notify';
 export type EffectiveMode = Exclude<HookMode, 'auto'>;
-export type PlanScope = 'scoped' | 'root' | 'none';
+export type PlanScope = 'scoped' | 'none';
 export type SelectionError =
   | 'plan-selector-required'
   | 'plan-branch-mismatch'

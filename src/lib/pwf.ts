@@ -77,7 +77,7 @@ export function handlePwfStatus(context: ProtocolContext): CommandResponse {
   );
   const lines = [
     'Planning status',
-    `Plan: ${status.planId ?? 'root'} (${status.planPath})`,
+    `Plan: ${status.planId ?? 'none'} (${status.planPath})`,
     `Scope: ${status.scope}`,
     ...(status.currentBranch
       ? [`Current branch: ${status.currentBranch}`]

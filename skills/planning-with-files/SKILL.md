@@ -14,16 +14,15 @@ Use three files as working memory for one task:
 .planning/<slug>/progress.md
 ```
 
-Use the project root only for a single small task. For ticket work, create a
-scoped directory:
+Always use a scoped directory:
 
 ```text
 .planning/2026-11-20-sposs-22391-deliverypoint-length/
 ```
 
 The extension, not the model, owns plan selection and lifecycle state. Do not
-create or edit `.planning/.active_plan`, `.branch`, `.plan-branch`, or
-`.planning/.archive/` by hand.
+create or edit `.planning/.active_plan`, `.branch`, or `.planning/.archive/` by
+hand.
 
 ## Budgets
 
