@@ -1,3 +1,13 @@
+## [1.1.0](https://github.com/unlight/zot-planning-with-files/compare/v1.0.0...v1.1.0) (2026-11-16)
+
+### Features
+
+* Add /plan-close command ([cb8ee5f](https://github.com/unlight/zot-planning-with-files/commit/cb8ee5f1e2ebb3787e7cf7ee48c134cb9eb798b8))
+
+### Bug Fixes
+
+* Gate auto-continue on in-progress phases ([07c7c8e](https://github.com/unlight/zot-planning-with-files/commit/07c7c8e7b30b61e7c0b9e2f8f1447f72c104827c))
+
 ## 1.0.0 (2026-11-09)
 
 ### Features

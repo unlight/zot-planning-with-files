@@ -7,7 +7,7 @@ import path from "node:path";
 // extension.json
 var extension_default = {
 	name: "pwf",
-	version: "1.0.0",
+	version: "1.1.0",
 	exec: "./dist/index.js",
 	language: "typescript",
 	skills: ["./skills"],
