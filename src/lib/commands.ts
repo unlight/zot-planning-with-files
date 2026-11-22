@@ -17,6 +17,7 @@ import {
 import { handlePlanClose } from './close.ts';
 import {
   buildTamperMessage,
+  logSelection,
   selectionErrorNotice,
   summarizePlan,
 } from './runtime.ts';
@@ -120,6 +121,7 @@ export function handleCommand(
 
 function handlePlanStatus(context: ProtocolContext): CommandResponse {
   const status = readPlanStatus(context.state.cwd);
+  logSelection(context, status);
   if (notifySelectionError(status, context.notify)) return { action: 'noop' };
   if (!status.exists) {
     context.notify('warn', 'No active plan (task_plan.md not found)');

@@ -210,6 +210,12 @@ function branchMismatchDetail(candidates, branch) {
 	return [`[planning-with-files] No plan is bound to branch ${branch}. Run /plan-list and /plan-use <slug>; nothing injected.`, ...candidates.map((candidate) => candidateLine(candidate))].join("\n");
 }
 // src/lib/plan-select.ts
+function mark(paths, reason) {
+	return {
+		...paths,
+		selectionReason: reason
+	};
+}
 function bindAndSelect(cwd, candidate, branch) {
 	bindPlanToBranch(candidate.paths, branch);
 	setActivePlan(cwd, candidate.slug);
@@ -223,55 +229,55 @@ function resolvePlanPaths(sessionCwd) {
 	const rootResult = resolveProjectRoot(sessionCwd);
 	const cwd = rootResult.cwd;
 	const currentBranch = readCurrentBranch(cwd);
-	if (rootResult.error) return withCurrentBranch(makeNone(cwd, rootResult.error), currentBranch);
+	if (rootResult.error) return mark(withCurrentBranch(makeNone(cwd, rootResult.error), currentBranch), "invalid-plan-root");
 	const planId = process.env.PLAN_ID?.trim();
 	if (planId) {
 		if (SLUG_RE.test(planId)) {
 			const candidate = path.join(cwd, ".planning", planId);
-			if (existsSync(path.join(candidate, "task_plan.md")) && isWithinRoot(cwd, candidate)) return withCurrentBranch(makeScoped(cwd, candidate), currentBranch);
+			if (existsSync(path.join(candidate, "task_plan.md")) && isWithinRoot(cwd, candidate)) return mark(withCurrentBranch(makeScoped(cwd, candidate), currentBranch), "plan-id");
 		}
-		return withCurrentBranch(makeNone(cwd, "plan-selector-rejected"), currentBranch);
+		return mark(withCurrentBranch(makeNone(cwd, "plan-selector-rejected"), currentBranch), "plan-id-rejected");
 	}
 	const candidates = listPlanCandidatesAt(cwd);
-	if (candidates.length === 0) return withCurrentBranch(makeNone(cwd), currentBranch);
-	if (candidates.length === 1) {
-		const only = candidates[0];
-		if (!only) return withCurrentBranch(makeNone(cwd), currentBranch);
-		if (currentBranch) {
-			if (!only.branch) return bindAndSelect(cwd, only, currentBranch);
-			if (only.branch !== currentBranch) return withCurrentBranch(makeNone(cwd, "plan-branch-mismatch", branchMismatchDetail(candidates, currentBranch)), currentBranch);
-		}
-		return withCurrentBranch(only.paths, currentBranch);
-	}
+	if (candidates.length === 0) return mark(withCurrentBranch(makeNone(cwd), currentBranch), "no-plan");
 	const activeId = readActivePlanId(cwd);
 	const activeCandidate = activeId ? candidates.find((candidate) => candidate.slug === activeId) : void 0;
-	if (!currentBranch) return withCurrentBranch(activeCandidate ? activeCandidate.paths : makeNone(cwd, "plan-selector-required", describeCandidates(candidates)), currentBranch);
+	if (candidates.length === 1) {
+		const only = candidates[0];
+		if (!only) return mark(withCurrentBranch(makeNone(cwd), currentBranch), "none");
+		if (currentBranch) {
+			if (!only.branch) return mark(bindAndSelect(cwd, only, currentBranch), "single-unbound-bound");
+			if (only.branch !== currentBranch) return mark(withCurrentBranch(makeNone(cwd, "plan-branch-mismatch", branchMismatchDetail(candidates, currentBranch)), currentBranch), "single-branch-mismatch");
+		}
+		return mark(withCurrentBranch(only.paths, currentBranch), currentBranch ? "single-branch" : "single-candidate");
+	}
+	if (!currentBranch) return mark(withCurrentBranch(activeCandidate ? activeCandidate.paths : makeNone(cwd, "plan-selector-required", describeCandidates(candidates)), currentBranch), activeCandidate ? "active-plan-no-git" : "selector-required-no-git");
 	const matching = candidates.filter((candidate) => candidate.branch === currentBranch);
 	const unbound = candidates.filter((candidate) => !candidate.branch);
 	const others = candidates.filter((candidate) => candidate.branch && candidate.branch !== currentBranch);
-	if (activeCandidate && activeCandidate.branch === currentBranch) return withCurrentBranch(activeCandidate.paths, currentBranch);
+	if (activeCandidate && activeCandidate.branch === currentBranch) return mark(withCurrentBranch(activeCandidate.paths, currentBranch), "active-plan");
 	if (matching.length === 1) {
 		const only = matching[0];
-		return withCurrentBranch(only ? only.paths : makeNone(cwd), currentBranch);
+		return mark(withCurrentBranch(only ? only.paths : makeNone(cwd), currentBranch), "single-matching-branch");
 	}
-	if (matching.length > 1) return withCurrentBranch(makeNone(cwd, "plan-selector-required", describeCandidates(matching, currentBranch)), currentBranch);
+	if (matching.length > 1) return mark(withCurrentBranch(makeNone(cwd, "plan-selector-required", describeCandidates(matching, currentBranch)), currentBranch), "multiple-matching");
 	if (unbound.length === 1 && others.length === 0) {
 		const only = unbound[0];
-		return only ? bindAndSelect(cwd, only, currentBranch) : withCurrentBranch(makeNone(cwd), currentBranch);
+		return mark(only ? bindAndSelect(cwd, only, currentBranch) : withCurrentBranch(makeNone(cwd), currentBranch), "single-unbound-bound");
 	}
-	if (unbound.length === 0 && others.length > 0) return withCurrentBranch(makeNone(cwd, "plan-branch-mismatch", branchMismatchDetail(candidates, currentBranch)), currentBranch);
-	if (unbound.length > 0) return withCurrentBranch(makeNone(cwd, "plan-selector-required", describeCandidates(candidates, currentBranch)), currentBranch);
-	return withCurrentBranch(makeNone(cwd), currentBranch);
+	if (unbound.length === 0 && others.length > 0) return mark(withCurrentBranch(makeNone(cwd, "plan-branch-mismatch", branchMismatchDetail(candidates, currentBranch)), currentBranch), "branch-mismatch");
+	if (unbound.length > 0) return mark(withCurrentBranch(makeNone(cwd, "plan-selector-required", describeCandidates(candidates, currentBranch)), currentBranch), "selector-required");
+	return mark(withCurrentBranch(makeNone(cwd), currentBranch), "none");
 }
 function resolvePlanPathsForTarget(sessionCwd, target) {
 	const rootResult = resolveProjectRoot(sessionCwd);
 	if (rootResult.error) return void 0;
 	const cwd = rootResult.cwd;
 	const currentBranch = readCurrentBranch(cwd);
-	if (!target || target === "root") return withCurrentBranch(makeRoot(cwd), currentBranch);
+	if (!target || target === "root") return mark(withCurrentBranch(makeRoot(cwd), currentBranch), "root-target");
 	if (!SLUG_RE.test(target)) return void 0;
 	const candidate = path.join(cwd, ".planning", target);
-	return existsSync(path.join(candidate, "task_plan.md")) && isWithinRoot(cwd, candidate) ? withCurrentBranch(makeScoped(cwd, candidate), currentBranch) : void 0;
+	return existsSync(path.join(candidate, "task_plan.md")) && isWithinRoot(cwd, candidate) ? mark(withCurrentBranch(makeScoped(cwd, candidate), currentBranch), "target") : void 0;
 }
 // src/lib/plan.ts
 function safeRead(filePath) {
@@ -403,7 +409,8 @@ function createState() {
 		goalBySession: /* @__PURE__ */ new Map(),
 		executionApprovedBySessionPlan: /* @__PURE__ */ new Set(),
 		extensionSubmits: /* @__PURE__ */ new Map(),
-		lastNotification: void 0
+		lastNotification: void 0,
+		lastSelectionLog: void 0
 	};
 }
 function planSessionKey(sessionId, status) {
@@ -452,10 +459,14 @@ function syncBranch(state, cwd) {
 function handlePlanList(context) {
 	const branch = readCurrentBranch(context.state.cwd);
 	const candidates = listPlanCandidates(context.state.cwd);
-	if (candidates.length === 0) return {
-		action: "display",
-		display: "[plan-list] No plans found."
-	};
+	if (candidates.length === 0) {
+		context.log(`plan-list current=${branch ?? "none"} plans=0`);
+		return {
+			action: "display",
+			display: "[plan-list] No plans found."
+		};
+	}
+	context.log(`plan-list current=${branch ?? "none"} plans=${candidates.length} archived=${candidates.filter((candidate) => candidate.archived).length}`);
 	const lines = [
 		`Current branch: ${branch ?? "none"}`,
 		"",
@@ -489,6 +500,7 @@ function handlePlanUse(commandArguments, context) {
 		error: `[plan-use] ${target} does not contain task_plan.md. Nothing was selected.`
 	};
 	const branch = readCurrentBranch(context.state.cwd);
+	context.log(`plan-use target=${target} branch=${branch ?? "none"} scope=${status.scope} plan=${status.planId ?? "none"}`);
 	const previousBranch = paths.branch;
 	if (branch) bindPlanToBranch(paths, branch);
 	setActivePlan(context.state.cwd, target);
@@ -623,6 +635,13 @@ function selectionErrorNotice(status) {
 		default: return "";
 	}
 }
+function logSelection(context, status) {
+	const reason = status.selectionReason ?? status.selectionError ?? "none";
+	const key = `${status.scope}:${status.planId ?? "none"}:${reason}:${status.currentBranch ?? "none"}`;
+	if (context.state.lastSelectionLog === key) return;
+	context.state.lastSelectionLog = key;
+	context.log(`selection scope=${status.scope} plan=${status.planId ?? "none"} rule=${reason} branch=${status.currentBranch ?? "none"}${status.selectionError ? ` error=${status.selectionError}` : ""}`);
+}
 function summarizePlan(status) {
 	if (!status.exists) return "No active task_plan.md";
 	if (status.totalPhases <= 0) return "task_plan.md detected (no phase headers yet)";
@@ -731,6 +750,7 @@ function currentPhaseName(status) {
 }
 function handlePwfStatus(context) {
 	const status = readPlanStatus(context.state.cwd);
+	logSelection(context, status);
 	const notice = selectionErrorNotice(status);
 	if (notice) {
 		context.notify("warn", notice);
@@ -818,6 +838,7 @@ function handleCommand(name, commandArguments, context) {
 }
 function handlePlanStatus(context) {
 	const status = readPlanStatus(context.state.cwd);
+	logSelection(context, status);
 	if (notifySelectionError(status, context.notify)) return { action: "noop" };
 	if (!status.exists) {
 		context.notify("warn", "No active plan (task_plan.md not found)");
@@ -1056,11 +1077,13 @@ function handleEvent(frame, context) {
 function onSessionStart(context) {
 	const state = context.state;
 	state.lastNotification = void 0;
+	state.lastSelectionLog = void 0;
 	clearSessionAutoContinue(state, state.sessionId);
 	clearSessionApprovals(state, state.sessionId);
 	clearSessionCompleteNotices(state, state.sessionId);
 	clearSessionLoop(state, state.sessionId);
 	const status = readPlanStatus(state.cwd);
+	logSelection(context, status);
 	const notice = selectionErrorNotice(status);
 	if (notice) {
 		context.notify("warn", notice, true);
@@ -1084,6 +1107,7 @@ function onSessionStart(context) {
 function onSessionEnd(context) {
 	const state = context.state;
 	state.lastNotification = void 0;
+	state.lastSelectionLog = void 0;
 	clearSessionAutoContinue(state, state.sessionId);
 	clearSessionApprovals(state, state.sessionId);
 	clearSessionCompleteNotices(state, state.sessionId);
@@ -1105,6 +1129,7 @@ function onTurnEnd(frame, context) {
 	if (isToolUseStop(frame.stop)) return;
 	const state = context.state;
 	const status = readPlanStatus(state.cwd);
+	logSelection(context, status);
 	if (!status.exists) return;
 	const sessionId = state.sessionId;
 	const planKey = planSessionKey(sessionId, status);
@@ -1179,6 +1204,7 @@ function handleBeforeAgentStart(frame, context) {
 	if (frame.model) state.host.model = frame.model;
 	if (typeof frame.system_prompt !== "string") return void 0;
 	const status = readPlanStatus(state.cwd);
+	logSelection(context, status);
 	const notice = selectionErrorNotice(status);
 	if (notice) return appendBlock(frame.system_prompt, notice);
 	if (!status.exists || status.isClosed || !isSessionAttached(status.cwd, state.sessionId) || !isExecutionApproved(state, state.sessionId, status)) return;
@@ -1270,6 +1296,7 @@ function notify(level, message, isStartup = false) {
 	]);
 	if (state.lastNotification === key) return;
 	state.lastNotification = key;
+	log(`notify ${level}${isStartup ? " startup" : ""}: ${text.slice(0, 80)}`);
 	const frame = {
 		type: "notify",
 		level,

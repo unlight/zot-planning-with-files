@@ -3,6 +3,7 @@ import { checkPlanAttestation } from './attestation.ts';
 import { readPlanStatus } from './plan.ts';
 import {
   deriveEffectiveMode,
+  logSelection,
   resolveConfiguredMode,
   selectionErrorNotice,
 } from './runtime.ts';
@@ -48,6 +49,7 @@ function currentPhaseName(status: PlanStatus): string {
 
 export function handlePwfStatus(context: ProtocolContext): CommandResponse {
   const status = readPlanStatus(context.state.cwd);
+  logSelection(context, status);
   const notice = selectionErrorNotice(status);
   if (notice) {
     context.notify('warn', notice);

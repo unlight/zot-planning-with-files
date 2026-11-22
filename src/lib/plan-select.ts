@@ -18,6 +18,10 @@ import {
 } from './plan-paths.ts';
 import type { PlanCandidate, PlanPaths } from './types.ts';
 
+function mark(paths: PlanPaths, reason: string): PlanPaths {
+  return { ...paths, selectionReason: reason };
+}
+
 function bindAndSelect(
   cwd: string,
   candidate: PlanCandidate,
@@ -36,7 +40,10 @@ export function resolvePlanPaths(sessionCwd: string): PlanPaths {
   const cwd = rootResult.cwd;
   const currentBranch = readCurrentBranch(cwd);
   if (rootResult.error) {
-    return withCurrentBranch(makeNone(cwd, rootResult.error), currentBranch);
+    return mark(
+      withCurrentBranch(makeNone(cwd, rootResult.error), currentBranch),
+      'invalid-plan-root',
+    );
   }
 
   // A set PLAN_ID is a binding, not a hint.
@@ -48,37 +55,21 @@ export function resolvePlanPaths(sessionCwd: string): PlanPaths {
         existsSync(path.join(candidate, 'task_plan.md')) &&
         isWithinRoot(cwd, candidate)
       ) {
-        return withCurrentBranch(makeScoped(cwd, candidate), currentBranch);
+        return mark(
+          withCurrentBranch(makeScoped(cwd, candidate), currentBranch),
+          'plan-id',
+        );
       }
     }
-    return withCurrentBranch(
-      makeNone(cwd, 'plan-selector-rejected'),
-      currentBranch,
+    return mark(
+      withCurrentBranch(makeNone(cwd, 'plan-selector-rejected'), currentBranch),
+      'plan-id-rejected',
     );
   }
 
   const candidates = listPlanCandidatesAt(cwd);
   if (candidates.length === 0) {
-    return withCurrentBranch(makeNone(cwd), currentBranch);
-  }
-
-  if (candidates.length === 1) {
-    const only = candidates[0];
-    if (!only) return withCurrentBranch(makeNone(cwd), currentBranch);
-    if (currentBranch) {
-      if (!only.branch) return bindAndSelect(cwd, only, currentBranch);
-      if (only.branch !== currentBranch) {
-        return withCurrentBranch(
-          makeNone(
-            cwd,
-            'plan-branch-mismatch',
-            branchMismatchDetail(candidates, currentBranch),
-          ),
-          currentBranch,
-        );
-      }
-    }
-    return withCurrentBranch(only.paths, currentBranch);
+    return mark(withCurrentBranch(makeNone(cwd), currentBranch), 'no-plan');
   }
 
   const activeId = readActivePlanId(cwd);
@@ -86,11 +77,41 @@ export function resolvePlanPaths(sessionCwd: string): PlanPaths {
     ? candidates.find(candidate => candidate.slug === activeId)
     : undefined;
 
+  if (candidates.length === 1) {
+    const only = candidates[0];
+    if (!only) {
+      return mark(withCurrentBranch(makeNone(cwd), currentBranch), 'none');
+    }
+    if (currentBranch) {
+      if (!only.branch) {
+        return mark(
+          bindAndSelect(cwd, only, currentBranch),
+          'single-unbound-bound',
+        );
+      }
+      if (only.branch !== currentBranch) {
+        const detail = branchMismatchDetail(candidates, currentBranch);
+        const paths = makeNone(cwd, 'plan-branch-mismatch', detail);
+        return mark(
+          withCurrentBranch(paths, currentBranch),
+          'single-branch-mismatch',
+        );
+      }
+    }
+    return mark(
+      withCurrentBranch(only.paths, currentBranch),
+      currentBranch ? 'single-branch' : 'single-candidate',
+    );
+  }
+
   if (!currentBranch) {
     const selected = activeCandidate
       ? activeCandidate.paths
       : makeNone(cwd, 'plan-selector-required', describeCandidates(candidates));
-    return withCurrentBranch(selected, currentBranch);
+    return mark(
+      withCurrentBranch(selected, currentBranch),
+      activeCandidate ? 'active-plan-no-git' : 'selector-required-no-git',
+    );
   }
 
   const matching = candidates.filter(
@@ -102,55 +123,49 @@ export function resolvePlanPaths(sessionCwd: string): PlanPaths {
   );
 
   if (activeCandidate && activeCandidate.branch === currentBranch) {
-    return withCurrentBranch(activeCandidate.paths, currentBranch);
+    return mark(
+      withCurrentBranch(activeCandidate.paths, currentBranch),
+      'active-plan',
+    );
   }
 
   if (matching.length === 1) {
     const only = matching[0];
-    return withCurrentBranch(only ? only.paths : makeNone(cwd), currentBranch);
+    return mark(
+      withCurrentBranch(only ? only.paths : makeNone(cwd), currentBranch),
+      'single-matching-branch',
+    );
   }
 
   if (matching.length > 1) {
-    return withCurrentBranch(
-      makeNone(
-        cwd,
-        'plan-selector-required',
-        describeCandidates(matching, currentBranch),
-      ),
-      currentBranch,
-    );
+    const detail = describeCandidates(matching, currentBranch);
+    const paths = makeNone(cwd, 'plan-selector-required', detail);
+    return mark(withCurrentBranch(paths, currentBranch), 'multiple-matching');
   }
 
   if (unbound.length === 1 && others.length === 0) {
     const only = unbound[0];
-    return only
-      ? bindAndSelect(cwd, only, currentBranch)
-      : withCurrentBranch(makeNone(cwd), currentBranch);
+    return mark(
+      only
+        ? bindAndSelect(cwd, only, currentBranch)
+        : withCurrentBranch(makeNone(cwd), currentBranch),
+      'single-unbound-bound',
+    );
   }
 
   if (unbound.length === 0 && others.length > 0) {
-    return withCurrentBranch(
-      makeNone(
-        cwd,
-        'plan-branch-mismatch',
-        branchMismatchDetail(candidates, currentBranch),
-      ),
-      currentBranch,
-    );
+    const detail = branchMismatchDetail(candidates, currentBranch);
+    const paths = makeNone(cwd, 'plan-branch-mismatch', detail);
+    return mark(withCurrentBranch(paths, currentBranch), 'branch-mismatch');
   }
 
   if (unbound.length > 0) {
-    return withCurrentBranch(
-      makeNone(
-        cwd,
-        'plan-selector-required',
-        describeCandidates(candidates, currentBranch),
-      ),
-      currentBranch,
-    );
+    const detail = describeCandidates(candidates, currentBranch);
+    const paths = makeNone(cwd, 'plan-selector-required', detail);
+    return mark(withCurrentBranch(paths, currentBranch), 'selector-required');
   }
 
-  return withCurrentBranch(makeNone(cwd), currentBranch);
+  return mark(withCurrentBranch(makeNone(cwd), currentBranch), 'none');
 }
 
 export function resolvePlanPathsForTarget(
@@ -163,13 +178,16 @@ export function resolvePlanPathsForTarget(
   const currentBranch = readCurrentBranch(cwd);
 
   if (!target || target === 'root') {
-    return withCurrentBranch(makeRoot(cwd), currentBranch);
+    return mark(withCurrentBranch(makeRoot(cwd), currentBranch), 'root-target');
   }
   if (!SLUG_RE.test(target)) return undefined;
 
   const candidate = path.join(cwd, '.planning', target);
   return existsSync(path.join(candidate, 'task_plan.md')) &&
     isWithinRoot(cwd, candidate)
-    ? withCurrentBranch(makeScoped(cwd, candidate), currentBranch)
+    ? mark(
+        withCurrentBranch(makeScoped(cwd, candidate), currentBranch),
+        'target',
+      )
     : undefined;
 }

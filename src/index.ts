@@ -108,6 +108,7 @@ function notify(level: NotifyLevel, message: string, isStartup = false): void {
   const key = JSON.stringify([level, text, isStartup]);
   if (state.lastNotification === key) return;
   state.lastNotification = key;
+  log(`notify ${level}${isStartup ? ' startup' : ''}: ${text.slice(0, 80)}`);
 
   const frame: Frame = { type: 'notify', level, message: text };
   if (isStartup) frame.startup = true;

@@ -21,6 +21,7 @@ export function createState(): RuntimeState {
     executionApprovedBySessionPlan: new Set(),
     extensionSubmits: new Map(),
     lastNotification: undefined,
+    lastSelectionLog: undefined,
   };
 }
 

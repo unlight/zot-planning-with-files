@@ -17,8 +17,12 @@ export function handlePlanList(context: ProtocolContext): CommandResponse {
   const branch = readCurrentBranch(context.state.cwd);
   const candidates = listPlanCandidates(context.state.cwd);
   if (candidates.length === 0) {
+    context.log(`plan-list current=${branch ?? 'none'} plans=0`);
     return { action: 'display', display: '[plan-list] No plans found.' };
   }
+  context.log(
+    `plan-list current=${branch ?? 'none'} plans=${candidates.length} archived=${candidates.filter(candidate => candidate.archived).length}`,
+  );
 
   const lines = [
     `Current branch: ${branch ?? 'none'}`,
@@ -62,6 +66,9 @@ export function handlePlanUse(
   }
 
   const branch = readCurrentBranch(context.state.cwd);
+  context.log(
+    `plan-use target=${target} branch=${branch ?? 'none'} scope=${status.scope} plan=${status.planId ?? 'none'}`,
+  );
   const previousBranch = paths.branch;
   if (branch) bindPlanToBranch(paths, branch);
   setActivePlan(context.state.cwd, target);

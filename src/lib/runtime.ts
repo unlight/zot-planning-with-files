@@ -11,7 +11,13 @@ import {
   PLAN_SELECTOR_REQUIRED_NOTICE,
   TAMPERED_PREFIX,
 } from './constants.ts';
-import type { EffectiveMode, HookMode, HostInfo, PlanStatus } from './types.ts';
+import type {
+  EffectiveMode,
+  HookMode,
+  HostInfo,
+  PlanStatus,
+  ProtocolContext,
+} from './types.ts';
 
 const HOOK_MODES = new Set<HookMode>([
   'auto',
@@ -85,6 +91,19 @@ export function selectionErrorNotice(status: PlanStatus): string {
       return '';
     }
   }
+}
+
+export function logSelection(
+  context: ProtocolContext,
+  status: PlanStatus,
+): void {
+  const reason = status.selectionReason ?? status.selectionError ?? 'none';
+  const key = `${status.scope}:${status.planId ?? 'none'}:${reason}:${status.currentBranch ?? 'none'}`;
+  if (context.state.lastSelectionLog === key) return;
+  context.state.lastSelectionLog = key;
+  context.log(
+    `selection scope=${status.scope} plan=${status.planId ?? 'none'} rule=${reason} branch=${status.currentBranch ?? 'none'}${status.selectionError ? ` error=${status.selectionError}` : ''}`,
+  );
 }
 
 export function summarizePlan(status: PlanStatus): string {

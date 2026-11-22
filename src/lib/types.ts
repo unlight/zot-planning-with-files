@@ -20,6 +20,7 @@ export interface PlanPaths {
   branch?: string;
   branchPath?: string;
   currentBranch?: string;
+  selectionReason?: string;
   attestationCandidates: string[];
 }
 
@@ -28,6 +29,7 @@ export interface PlanCandidate {
   paths: PlanPaths;
   branch?: string;
   mtimeMs: number;
+  archived?: boolean;
 }
 
 export interface PlanStatus extends PlanPaths {
@@ -75,6 +77,7 @@ export interface RuntimeState {
   executionApprovedBySessionPlan: Set<string>;
   extensionSubmits: Map<string, number>;
   lastNotification?: string;
+  lastSelectionLog?: string;
 }
 
 export interface Frame {

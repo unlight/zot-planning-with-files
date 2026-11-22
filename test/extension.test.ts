@@ -318,6 +318,23 @@ test('registers the planning command surface', async t => {
   assert.match(response.display ?? '', /Execution: passive/);
 });
 
+test('logs plan selection and notifications', async t => {
+  const project = createProject();
+  t.after(() => rmSync(project, { recursive: true, force: true }));
+  const session = await startExtension(project);
+  t.after(() => session.close());
+
+  await session.beginSession('s1');
+  await session.command('plan-status');
+  await new Promise(resolve => setTimeout(resolve, 100));
+
+  assert.match(
+    session.stderr(),
+    /selection scope=root plan=none rule=single-candidate/,
+  );
+  assert.match(session.stderr(), /notify info startup:/);
+});
+
 test('pwf aliases start the workflow and show status', async t => {
   const project = createProject();
   t.after(() => rmSync(project, { recursive: true, force: true }));

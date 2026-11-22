@@ -16,6 +16,7 @@ import {
   buildParityPlanInjection,
   buildTamperMessage,
   deriveEffectiveMode,
+  logSelection,
   resolveConfiguredMode,
   selectionErrorNotice,
   summarizePlan,
@@ -108,12 +109,14 @@ export function handleEvent(frame: EventFrame, context: ProtocolContext): void {
 function onSessionStart(context: ProtocolContext): void {
   const state: RuntimeState = context.state;
   state.lastNotification = undefined;
+  state.lastSelectionLog = undefined;
   clearSessionAutoContinue(state, state.sessionId);
   clearSessionApprovals(state, state.sessionId);
   clearSessionCompleteNotices(state, state.sessionId);
   clearSessionLoop(state, state.sessionId);
 
   const status = readPlanStatus(state.cwd);
+  logSelection(context, status);
   const notice = selectionErrorNotice(status);
   if (notice) {
     context.notify('warn', notice, true);
@@ -150,6 +153,7 @@ function onSessionStart(context: ProtocolContext): void {
 function onSessionEnd(context: ProtocolContext): void {
   const state = context.state;
   state.lastNotification = undefined;
+  state.lastSelectionLog = undefined;
   clearSessionAutoContinue(state, state.sessionId);
   clearSessionApprovals(state, state.sessionId);
   clearSessionCompleteNotices(state, state.sessionId);
@@ -177,6 +181,7 @@ function onTurnEnd(frame: EventFrame, context: ProtocolContext): void {
 
   const state = context.state;
   const status = readPlanStatus(state.cwd);
+  logSelection(context, status);
   if (!status.exists) return;
 
   const sessionId = state.sessionId;
@@ -317,6 +322,7 @@ export function handleBeforeAgentStart(
   if (typeof frame.system_prompt !== 'string') return undefined;
 
   const status = readPlanStatus(state.cwd);
+  logSelection(context, status);
   const notice = selectionErrorNotice(status);
   if (notice) return appendBlock(frame.system_prompt, notice);
   if (
