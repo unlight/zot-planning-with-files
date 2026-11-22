@@ -23,6 +23,7 @@ import {
 import {
   clearSessionApprovals,
   clearSessionAutoContinue,
+  clearSessionCompleteNotices,
   clearSessionLoop,
   isExecutionApproved,
   planSessionKey,
@@ -109,6 +110,7 @@ function onSessionStart(context: ProtocolContext): void {
   state.lastNotification = undefined;
   clearSessionAutoContinue(state, state.sessionId);
   clearSessionApprovals(state, state.sessionId);
+  clearSessionCompleteNotices(state, state.sessionId);
   clearSessionLoop(state, state.sessionId);
 
   const status = readPlanStatus(state.cwd);
@@ -130,6 +132,14 @@ function onSessionStart(context: ProtocolContext): void {
     context.notify('info', `${summarizePlan(status)} - plan closed`, true);
     return;
   }
+  if (isAllPhasesComplete(status)) {
+    context.notify(
+      'info',
+      `${summarizePlan(status)} - run /plan-close when the task is done`,
+      true,
+    );
+    return;
+  }
   context.notify(
     'info',
     `${summarizePlan(status)} - run /plan-execute to activate hooks`,
@@ -142,6 +152,7 @@ function onSessionEnd(context: ProtocolContext): void {
   state.lastNotification = undefined;
   clearSessionAutoContinue(state, state.sessionId);
   clearSessionApprovals(state, state.sessionId);
+  clearSessionCompleteNotices(state, state.sessionId);
   clearSessionLoop(state, state.sessionId);
 }
 
@@ -178,12 +189,16 @@ function onTurnEnd(frame: EventFrame, context: ProtocolContext): void {
 
   if (isAllPhasesComplete(status)) {
     state.autoContinueBySessionPlan.set(planKey, 0);
-    context.notify(
-      'info',
-      `[planning-with-files] ALL PHASES COMPLETE (${status.completePhases}/${status.totalPhases}).`,
-    );
+    if (!state.completeNoticeBySessionPlan.has(planKey)) {
+      state.completeNoticeBySessionPlan.add(planKey);
+      context.notify(
+        'info',
+        `[planning-with-files] ALL PHASES COMPLETE (${status.completePhases}/${status.totalPhases}). Run /plan-close when the task is done.`,
+      );
+    }
     return;
   }
+  state.completeNoticeBySessionPlan.delete(planKey);
 
   if (isFailedTurn(frame)) return;
   if (!shouldAutoContinue(status)) {

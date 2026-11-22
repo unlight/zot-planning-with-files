@@ -49,6 +49,11 @@ Prove the extension works.
 - **Status:** pending
 `;
 
+const COMPLETE_PLAN = PLAN.replaceAll(
+  '**Status:** in_progress',
+  '**Status:** complete',
+).replaceAll('**Status:** pending', '**Status:** complete');
+
 const PROGRESS = `# Progress Log
 
 ## Session: 2026-01-01
@@ -547,6 +552,60 @@ test('a changed plan is blocked from injection', async t => {
 
   assert.match(response.system_prompt ?? '', /PLAN TAMPERED/);
   assert.doesNotMatch(response.system_prompt ?? '', /===BEGIN PLAN DATA===/);
+});
+
+test('reports all phases complete once and suggests /plan-close', async t => {
+  const project = createProject();
+  t.after(() => rmSync(project, { recursive: true, force: true }));
+  writeFileSync(join(project, 'task_plan.md'), COMPLETE_PLAN);
+  const session = await startExtension(project);
+  t.after(() => session.close());
+
+  const startup = await session.beginSession('s1');
+  assert.match(
+    startup?.message ?? '',
+    /run \/plan-close when the task is done/,
+  );
+
+  session.send({
+    type: 'event',
+    event: 'turn_end',
+    stop: 'end_turn',
+    session_id: 's1',
+    cwd: project,
+  });
+  const notice = await session.frames.next(
+    frame =>
+      frame.type === 'notify' &&
+      typeof frame.message === 'string' &&
+      frame.message.includes('ALL PHASES COMPLETE'),
+  );
+  assert.match(notice.message ?? '', /Run \/plan-close when the task is done/);
+
+  session.send({
+    type: 'event',
+    event: 'user_prompt_submit',
+    text: 'thanks',
+    session_id: 's1',
+    cwd: project,
+  });
+  session.send({
+    type: 'event',
+    event: 'turn_end',
+    stop: 'end_turn',
+    session_id: 's1',
+    cwd: project,
+  });
+  await new Promise(resolve => setTimeout(resolve, 300));
+  assert.equal(
+    session.frames.queue.some(
+      frame =>
+        frame.type === 'notify' &&
+        typeof frame.message === 'string' &&
+        frame.message.includes('ALL PHASES COMPLETE'),
+    ),
+    false,
+  );
 });
 
 test('turn_end auto-continues three times and then stops', async t => {

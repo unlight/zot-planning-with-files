@@ -69,6 +69,7 @@ export interface RuntimeState {
   branch?: string;
   host: HostInfo;
   autoContinueBySessionPlan: Map<string, number>;
+  completeNoticeBySessionPlan: Set<string>;
   loopTimersBySession: Map<string, NodeJS.Timeout>;
   goalBySession: Map<string, string>;
   executionApprovedBySessionPlan: Set<string>;

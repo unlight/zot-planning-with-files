@@ -379,6 +379,11 @@ Because the marker changes the plan bytes, the command clears the attestation as
 well. Reopen the plan with `/plan-close clear`, then run `/plan-attest` and
 `/plan-execute` again.
 
+When the last phase becomes `complete`, the extension stops auto-continue and
+reports `ALL PHASES COMPLETE` once per session. Run `/plan-close` to stop
+injection and later-session reminders. Closing is the explicit "work finished"
+state; leaving a completed plan open keeps it active for future prompts.
+
 Closing does not delete the planning files. Use a new plan for the next task
 instead of reopening a completed plan.
 
@@ -386,19 +391,20 @@ instead of reopening a completed plan.
 
 The extension uses the lifecycle events and interception points zot provides:
 
-| Behavior                               | zot implementation                                                                                                                |
-| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| Session catchup on `session_start`     | Startup notification with the phase summary and the `/plan-execute` hint. No host session-store access.                           |
-| Plan injection on `before_agent_start` | `before_agent_start` intercept appends to the complete system prompt.                                                             |
-| Pre-tool plan recitation               | Not available without starting a turn. The injected prompt and auto-continue tell the model to re-read the plan.                  |
-| Post-write reminder on `tool_result`   | `notify` reminder after `write` or `edit`. zot cannot append text to a tool result.                                               |
-| Auto-continue on `agent_end`           | `turn_end` with a terminal stop reason, then `submit` with the continuation prompt, limit 3, only while a phase is `in_progress`. |
-| Pre-compaction reminder                | `pre_compact` notification, including the attested hash when present.                                                             |
+| Behavior                               | zot implementation                                                                                                                                                              |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Session catchup on `session_start`     | Startup notification with the phase summary, plus `/plan-execute` or `/plan-close` when all phases are complete. No session-store access.                                       |
+| Plan injection on `before_agent_start` | `before_agent_start` intercept appends to the complete system prompt.                                                                                                           |
+| Pre-tool plan recitation               | Not available without starting a turn. The injected prompt and auto-continue tell the model to re-read the plan.                                                                |
+| Post-write reminder on `tool_result`   | `notify` reminder after `write` or `edit`. zot cannot append text to a tool result.                                                                                             |
+| Auto-continue on `agent_end`           | `turn_end` with a terminal stop reason, then `submit` with the continuation prompt, limit 3, only while a phase is `in_progress`. Reports all phases complete once per session. |
+| Pre-compaction reminder                | `pre_compact` notification, including the attested hash when present.                                                                                                           |
 
 The extension also:
 
 - warns when `write` or `edit` runs without a `task_plan.md`;
 - resets the auto-continue budget when the user submits a new prompt;
+- reports all phases complete once per session and suggests `/plan-close`;
 - clears execution approval on session start and session end.
 
 ## Upstream skill

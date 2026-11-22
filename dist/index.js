@@ -398,6 +398,7 @@ function createState() {
 			dataDir: ""
 		},
 		autoContinueBySessionPlan: /* @__PURE__ */ new Map(),
+		completeNoticeBySessionPlan: /* @__PURE__ */ new Set(),
 		loopTimersBySession: /* @__PURE__ */ new Map(),
 		goalBySession: /* @__PURE__ */ new Map(),
 		executionApprovedBySessionPlan: /* @__PURE__ */ new Set(),
@@ -427,6 +428,9 @@ function clearPlanApprovals(state, status) {
 function clearSessionAutoContinue(state, sessionId) {
 	for (const key of state.autoContinueBySessionPlan.keys()) if (key.startsWith(`${sessionId}:`)) state.autoContinueBySessionPlan.delete(key);
 }
+function clearSessionCompleteNotices(state, sessionId) {
+	for (const key of state.completeNoticeBySessionPlan) if (key.startsWith(`${sessionId}:`)) state.completeNoticeBySessionPlan.delete(key);
+}
 function clearSessionLoop(state, sessionId) {
 	const timer = state.loopTimersBySession.get(sessionId);
 	if (timer) clearInterval(timer);
@@ -440,6 +444,7 @@ function syncBranch(state, cwd) {
 	if (!previous || previous === branch) return void 0;
 	clearSessionApprovals(state, state.sessionId);
 	clearSessionAutoContinue(state, state.sessionId);
+	clearSessionCompleteNotices(state, state.sessionId);
 	clearSessionLoop(state, state.sessionId);
 	return `[planning-with-files] Branch changed: ${previous} -> ${branch}. Execution approval cleared. Run /plan-execute for the current plan.`;
 }
@@ -1053,6 +1058,7 @@ function onSessionStart(context) {
 	state.lastNotification = void 0;
 	clearSessionAutoContinue(state, state.sessionId);
 	clearSessionApprovals(state, state.sessionId);
+	clearSessionCompleteNotices(state, state.sessionId);
 	clearSessionLoop(state, state.sessionId);
 	const status = readPlanStatus(state.cwd);
 	const notice = selectionErrorNotice(status);
@@ -1069,6 +1075,10 @@ function onSessionStart(context) {
 		context.notify("info", `${summarizePlan(status)} - plan closed`, true);
 		return;
 	}
+	if (isAllPhasesComplete(status)) {
+		context.notify("info", `${summarizePlan(status)} - run /plan-close when the task is done`, true);
+		return;
+	}
 	context.notify("info", `${summarizePlan(status)} - run /plan-execute to activate hooks`, true);
 }
 function onSessionEnd(context) {
@@ -1076,6 +1086,7 @@ function onSessionEnd(context) {
 	state.lastNotification = void 0;
 	clearSessionAutoContinue(state, state.sessionId);
 	clearSessionApprovals(state, state.sessionId);
+	clearSessionCompleteNotices(state, state.sessionId);
 	clearSessionLoop(state, state.sessionId);
 }
 function onUserPromptSubmit(frame, context) {
@@ -1103,9 +1114,13 @@ function onTurnEnd(frame, context) {
 	}
 	if (isAllPhasesComplete(status)) {
 		state.autoContinueBySessionPlan.set(planKey, 0);
-		context.notify("info", `[planning-with-files] ALL PHASES COMPLETE (${status.completePhases}/${status.totalPhases}).`);
+		if (!state.completeNoticeBySessionPlan.has(planKey)) {
+			state.completeNoticeBySessionPlan.add(planKey);
+			context.notify("info", `[planning-with-files] ALL PHASES COMPLETE (${status.completePhases}/${status.totalPhases}). Run /plan-close when the task is done.`);
+		}
 		return;
 	}
+	state.completeNoticeBySessionPlan.delete(planKey);
 	if (isFailedTurn(frame)) return;
 	if (!shouldAutoContinue(status)) {
 		debug(context, "auto-continue skipped: no in_progress phase");

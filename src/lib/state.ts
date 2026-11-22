@@ -15,6 +15,7 @@ export function createState(): RuntimeState {
       dataDir: '',
     },
     autoContinueBySessionPlan: new Map(),
+    completeNoticeBySessionPlan: new Set(),
     loopTimersBySession: new Map(),
     goalBySession: new Map(),
     executionApprovedBySessionPlan: new Set(),
@@ -85,6 +86,16 @@ export function clearSessionAutoContinue(
   }
 }
 
+export function clearSessionCompleteNotices(
+  state: RuntimeState,
+  sessionId: string,
+): void {
+  for (const key of state.completeNoticeBySessionPlan) {
+    if (key.startsWith(`${sessionId}:`))
+      state.completeNoticeBySessionPlan.delete(key);
+  }
+}
+
 export function clearSessionLoop(state: RuntimeState, sessionId: string): void {
   const timer = state.loopTimersBySession.get(sessionId);
   if (timer) clearInterval(timer);
@@ -104,6 +115,7 @@ export function syncBranch(
 
   clearSessionApprovals(state, state.sessionId);
   clearSessionAutoContinue(state, state.sessionId);
+  clearSessionCompleteNotices(state, state.sessionId);
   clearSessionLoop(state, state.sessionId);
   return `[planning-with-files] Branch changed: ${previous} -> ${branch}. Execution approval cleared. Run /plan-execute for the current plan.`;
 }
