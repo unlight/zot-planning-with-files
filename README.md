@@ -31,12 +31,8 @@ trimmed zot-specific skill is bundled with the extension.
    ```
 
 2. The extension bundles the zot-specific skill
-   `pwf:planning`. No separate skill install is required. `/pwf`
-   loads it automatically. For manual invocation:
-
-   ```text
-   /skill:pwf:planning
-   ```
+   `pwf:planning`. No separate skill install is required. `/pwf` loads it
+   automatically.
 
    If an older upstream `planning-with-files` skill is still installed, remove
    it to avoid two conflicting instruction sets. The bundled skill includes the
@@ -422,11 +418,7 @@ skills/planning-with-files/LICENSE
 ```
 
 zot namespaces extension skills, so the canonical name is
-`pwf:planning`. `/pwf` loads it through the `skill` tool:
-
-```text
-/skill:pwf:planning
-```
+`pwf:planning`. `/pwf` loads it through the `skill` tool.
 
 The bundled skill covers the three files, phase format, budgets, branch-aware
 selection, close marker, and archive behavior. It intentionally omits the
