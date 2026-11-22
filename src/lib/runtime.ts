@@ -4,10 +4,11 @@ import { checkPlanAttestation } from './attestation.ts';
 import {
   CACHE_SAFE_REMINDER,
   INVALID_PLAN_ROOT_NOTICE,
+  PLAN_BRANCH_MISMATCH_NOTICE,
   PLAN_DATA_BEGIN,
   PLAN_DATA_END,
   PLAN_SELECTOR_REJECTED_NOTICE,
-  SESSION_PLAN_AMBIGUOUS_NOTICE,
+  PLAN_SELECTOR_REQUIRED_NOTICE,
   TAMPERED_PREFIX,
 } from './constants.ts';
 import type { EffectiveMode, HookMode, HostInfo, PlanStatus } from './types.ts';
@@ -66,9 +67,13 @@ export function deriveEffectiveMode(
 }
 
 export function selectionErrorNotice(status: PlanStatus): string {
+  if (status.selectionErrorDetail) return status.selectionErrorDetail;
   switch (status.selectionError) {
-    case 'session-plan-ambiguous': {
-      return SESSION_PLAN_AMBIGUOUS_NOTICE;
+    case 'plan-selector-required': {
+      return PLAN_SELECTOR_REQUIRED_NOTICE;
+    }
+    case 'plan-branch-mismatch': {
+      return PLAN_BRANCH_MISMATCH_NOTICE;
     }
     case 'invalid-plan-root': {
       return INVALID_PLAN_ROOT_NOTICE;

@@ -2,18 +2,32 @@ export type HookMode = 'auto' | 'parity' | 'cache-safe' | 'notify';
 export type EffectiveMode = Exclude<HookMode, 'auto'>;
 export type PlanScope = 'scoped' | 'root' | 'none';
 export type SelectionError =
-  'session-plan-ambiguous' | 'invalid-plan-root' | 'plan-selector-rejected';
+  | 'plan-selector-required'
+  | 'plan-branch-mismatch'
+  | 'invalid-plan-root'
+  | 'plan-selector-rejected';
 
 export interface PlanPaths {
   cwd: string;
   scope: PlanScope;
   selectionError?: SelectionError;
+  selectionErrorDetail?: string;
   planPath?: string;
   progressPath?: string;
   findingsPath?: string;
   planDir?: string;
   planId?: string;
+  branch?: string;
+  branchPath?: string;
+  currentBranch?: string;
   attestationCandidates: string[];
+}
+
+export interface PlanCandidate {
+  slug: string;
+  paths: PlanPaths;
+  branch?: string;
+  mtimeMs: number;
 }
 
 export interface PlanStatus extends PlanPaths {
@@ -52,6 +66,7 @@ export interface HostInfo {
 export interface RuntimeState {
   cwd: string;
   sessionId: string;
+  branch?: string;
   host: HostInfo;
   autoContinueBySessionPlan: Map<string, number>;
   loopTimersBySession: Map<string, NodeJS.Timeout>;

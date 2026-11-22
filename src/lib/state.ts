@@ -1,3 +1,4 @@
+import { readCurrentBranch } from './branch.ts';
 import type { PlanStatus, RuntimeState } from './types.ts';
 
 export function createState(): RuntimeState {
@@ -88,4 +89,21 @@ export function clearSessionLoop(state: RuntimeState, sessionId: string): void {
   const timer = state.loopTimersBySession.get(sessionId);
   if (timer) clearInterval(timer);
   state.loopTimersBySession.delete(sessionId);
+}
+
+export function syncBranch(
+  state: RuntimeState,
+  cwd: string,
+): string | undefined {
+  const branch = readCurrentBranch(cwd);
+  if (!branch) return undefined;
+
+  const previous = state.branch;
+  state.branch = branch;
+  if (!previous || previous === branch) return undefined;
+
+  clearSessionApprovals(state, state.sessionId);
+  clearSessionAutoContinue(state, state.sessionId);
+  clearSessionLoop(state, state.sessionId);
+  return `[planning-with-files] Branch changed: ${previous} -> ${branch}. Execution approval cleared. Run /plan-execute for the current plan.`;
 }

@@ -26,6 +26,7 @@ import {
   clearSessionLoop,
   isExecutionApproved,
   planSessionKey,
+  syncBranch,
 } from './state.ts';
 import type {
   EventFrame,
@@ -61,6 +62,8 @@ function debug(context: ProtocolContext, message: string): void {
 
 export function handleEvent(frame: EventFrame, context: ProtocolContext): void {
   syncContext(frame, context);
+  const branchNotice = syncBranch(context.state, context.state.cwd);
+  if (branchNotice) context.notify('warn', branchNotice);
 
   switch (frame.event) {
     case 'session_start': {
@@ -290,6 +293,8 @@ export function handleBeforeAgentStart(
 ): string | undefined {
   const state = context.state;
   syncContext(frame, context);
+  const branchNotice = syncBranch(state, state.cwd);
+  if (branchNotice) context.notify('warn', branchNotice);
   if (frame.provider) state.host.provider = frame.provider;
   if (frame.model) state.host.model = frame.model;
 

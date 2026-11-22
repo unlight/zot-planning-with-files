@@ -76,6 +76,10 @@ export function handlePwfStatus(context: ProtocolContext): CommandResponse {
     'Planning status',
     `Plan: ${status.planId ?? 'root'} (${status.planPath})`,
     `Scope: ${status.scope}`,
+    ...(status.currentBranch
+      ? [`Current branch: ${status.currentBranch}`]
+      : []),
+    ...(status.branch ? [`Plan branch: ${status.branch}`] : []),
     `Mode: ${mode}`,
     `Attestation: ${attestation.enabled ? (attestation.tampered ? 'TAMPERED' : 'valid') : 'not recorded'}`,
     `Closed: ${status.isClosed ? 'yes' : 'no'}`,

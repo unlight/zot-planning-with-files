@@ -20,6 +20,8 @@ const EXT_DIR = dirname(dirname(import.meta.filename));
 const EXPECTED_COMMANDS = [
   'plan-status',
   'plan-attest',
+  'plan-list',
+  'plan-use',
   'plan-close',
   'plan-execute',
   'plan-goal',
@@ -67,6 +69,7 @@ interface TestFrame {
   system_prompt?: string;
   startup?: boolean;
   display?: string;
+  error?: string;
   action?: string;
   prompt?: string;
   tool_name?: string;
@@ -101,6 +104,12 @@ function createProject({
     writeFileSync(join(dir, 'progress.md'), PROGRESS);
   }
   return dir;
+}
+
+function setGitBranch(projectDir: string, branch: string): void {
+  const gitDirectory = join(projectDir, '.git');
+  mkdirSync(gitDirectory, { recursive: true });
+  writeFileSync(join(gitDirectory, 'HEAD'), `ref: refs/heads/${branch}\n`);
 }
 
 function createFrameQueue(child: TestChild): FrameQueue {
@@ -841,6 +850,201 @@ test('deduplicates identical notifications until user input', async t => {
     repeated.message,
     'No task_plan.md found. Create planning files first.',
   );
+});
+
+test('selects only the plan bound to the current branch', async t => {
+  const project = createProject({ withPlan: false });
+  t.after(() => rmSync(project, { recursive: true, force: true }));
+  for (const slug of ['feature-a', 'feature-b']) {
+    mkdirSync(join(project, '.planning', slug), { recursive: true });
+    writeFileSync(join(project, '.planning', slug, 'task_plan.md'), PLAN);
+  }
+  writeFileSync(
+    join(project, '.planning', 'feature-a', '.branch'),
+    'feature/a\n',
+  );
+  writeFileSync(
+    join(project, '.planning', 'feature-b', '.branch'),
+    'feature/b\n',
+  );
+  writeFileSync(join(project, '.planning', '.active_plan'), 'feature-b\n');
+  setGitBranch(project, 'feature/a');
+
+  const session = await startExtension(project);
+  t.after(() => session.close());
+
+  const status = await session.command('plan-status');
+  assert.match(status.display ?? '', /Current branch: feature\/a/);
+  assert.match(status.display ?? '', /Plan branch: feature\/a/);
+  assert.match(status.display ?? '', /\.planning\/feature-a\/task_plan\.md/);
+  assert.doesNotMatch(
+    status.display ?? '',
+    /\.planning\/feature-b\/task_plan\.md/,
+  );
+
+  setGitBranch(project, 'feature/b');
+  const switched = await session.command('plan-status');
+  assert.match(switched.display ?? '', /Current branch: feature\/b/);
+  assert.match(switched.display ?? '', /Plan branch: feature\/b/);
+  assert.match(switched.display ?? '', /\.planning\/feature-b\/task_plan\.md/);
+});
+
+test('multiple matching plans require /plan-use', async t => {
+  const project = createProject({ withPlan: false });
+  t.after(() => rmSync(project, { recursive: true, force: true }));
+  for (const slug of ['alpha', 'beta']) {
+    mkdirSync(join(project, '.planning', slug), { recursive: true });
+    writeFileSync(join(project, '.planning', slug, 'task_plan.md'), PLAN);
+    writeFileSync(join(project, '.planning', slug, '.branch'), 'feature/a\n');
+  }
+  setGitBranch(project, 'feature/a');
+
+  const session = await startExtension(project);
+  t.after(() => session.close());
+
+  const list = await session.command('plan-list');
+  assert.match(list.display ?? '', /Current branch: feature\/a/);
+  assert.match(list.display ?? '', /\*alpha\tfeature\/a/);
+  assert.match(list.display ?? '', /\*beta\tfeature\/a/);
+
+  const ambiguous = await session.command('plan-status');
+  assert.equal(ambiguous.action, 'noop');
+  const warning = await session.frames.next(
+    frame =>
+      frame.type === 'notify' &&
+      typeof frame.message === 'string' &&
+      frame.message.includes(
+        'Multiple plans are available for branch feature/a',
+      ),
+  );
+  assert.match(warning.message ?? '', /alpha \(branch: feature\/a\)/);
+  assert.match(warning.message ?? '', /beta \(branch: feature\/a\)/);
+
+  const selected = await session.command('plan-use', 'alpha');
+  assert.equal(selected.action, 'noop');
+  await session.frames.next(
+    frame =>
+      frame.type === 'notify' &&
+      typeof frame.message === 'string' &&
+      frame.message.includes('Plan selected: alpha'),
+  );
+  assert.equal(
+    readFileSync(join(project, '.planning', '.active_plan'), 'utf8'),
+    'alpha\n',
+  );
+  assert.equal(
+    readFileSync(join(project, '.planning', 'alpha', '.branch'), 'utf8'),
+    'feature/a\n',
+  );
+
+  const status = await session.command('plan-status');
+  assert.match(status.display ?? '', /\.planning\/alpha\/task_plan\.md/);
+
+  const rejected = await session.command('plan-use', 'missing');
+  assert.equal(rejected.action, 'noop');
+  assert.match(rejected.error ?? '', /did not resolve/);
+
+  const missingRoot = await session.command('plan-use', 'root');
+  assert.equal(missingRoot.action, 'noop');
+  assert.match(missingRoot.error ?? '', /does not contain task_plan\.md/);
+});
+
+test('refuses a plan bound to another branch', async t => {
+  const project = createProject({ withPlan: false });
+  t.after(() => rmSync(project, { recursive: true, force: true }));
+  mkdirSync(join(project, '.planning', 'other'), { recursive: true });
+  writeFileSync(join(project, '.planning', 'other', 'task_plan.md'), PLAN);
+  writeFileSync(join(project, '.planning', 'other', '.branch'), 'feature/b\n');
+  setGitBranch(project, 'feature/a');
+
+  const session = await startExtension(project);
+  t.after(() => session.close());
+
+  const status = await session.command('plan-status');
+  assert.equal(status.action, 'noop');
+  const warning = await session.frames.next(
+    frame =>
+      frame.type === 'notify' &&
+      typeof frame.message === 'string' &&
+      frame.message.includes('No plan is bound to branch feature/a'),
+  );
+  assert.match(warning.message ?? '', /other \(branch: feature\/b\)/);
+});
+
+test('binds a single unbound plan to the current branch', async t => {
+  const project = createProject({ withPlan: false });
+  t.after(() => rmSync(project, { recursive: true, force: true }));
+  mkdirSync(join(project, '.planning', 'alpha'), { recursive: true });
+  writeFileSync(join(project, '.planning', 'alpha', 'task_plan.md'), PLAN);
+  setGitBranch(project, 'feature/a');
+
+  const session = await startExtension(project);
+  t.after(() => session.close());
+
+  const status = await session.command('plan-status');
+  assert.match(status.display ?? '', /\.planning\/alpha\/task_plan\.md/);
+  assert.equal(
+    readFileSync(join(project, '.planning', 'alpha', '.branch'), 'utf8'),
+    'feature/a\n',
+  );
+  assert.equal(
+    readFileSync(join(project, '.planning', '.active_plan'), 'utf8'),
+    'alpha\n',
+  );
+});
+
+test('branch sidecar does not invalidate attestation', async t => {
+  const project = createProject({ withPlan: false });
+  t.after(() => rmSync(project, { recursive: true, force: true }));
+  mkdirSync(join(project, '.planning', 'alpha'), { recursive: true });
+  writeFileSync(join(project, '.planning', 'alpha', 'task_plan.md'), PLAN);
+  setGitBranch(project, 'feature/a');
+
+  const session = await startExtension(project);
+  t.after(() => session.close());
+  await session.beginSession('s1');
+  await session.command('plan-attest', '--target alpha');
+  writeFileSync(join(project, '.planning', 'alpha', '.branch'), 'feature/a\n');
+
+  const show = await session.command('plan-attest', '--show');
+  assert.match(show.display ?? '', /Status: valid/);
+});
+
+test('branch change clears execution approval', async t => {
+  const project = createProject({ withPlan: false });
+  t.after(() => rmSync(project, { recursive: true, force: true }));
+  mkdirSync(join(project, '.planning', 'alpha'), { recursive: true });
+  writeFileSync(join(project, '.planning', 'alpha', 'task_plan.md'), PLAN);
+  writeFileSync(join(project, '.planning', 'alpha', '.branch'), 'feature/a\n');
+  setGitBranch(project, 'feature/a');
+
+  const session = await startExtension(project);
+  t.after(() => session.close());
+  await session.beginSession('s1');
+  await session.command('plan-attest');
+  await session.command('plan-execute');
+  await session.frames.next(
+    frame =>
+      frame.type === 'notify' &&
+      typeof frame.message === 'string' &&
+      frame.message.includes('Plan execution approved'),
+  );
+
+  const active = await session.command('plan-status');
+  assert.match(active.display ?? '', /Execution: active/);
+
+  setGitBranch(project, 'feature/b');
+  await session.command('plan-status');
+  await session.frames.next(
+    frame =>
+      frame.type === 'notify' &&
+      typeof frame.message === 'string' &&
+      frame.message.includes('Branch changed: feature/a -> feature/b'),
+  );
+
+  setGitBranch(project, 'feature/a');
+  const passive = await session.command('plan-status');
+  assert.match(passive.display ?? '', /Execution: passive/);
 });
 
 test('PLAN_ID binds resolution and a bad selector is refused', async t => {

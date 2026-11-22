@@ -3,6 +3,7 @@ import {
   readPlanStatus,
   resolvePlanPathsForTarget,
 } from './plan.ts';
+import { handlePlanList, handlePlanUse } from './plan-commands.ts';
 import {
   checkPlanAttestation,
   clearPlanAttestation,
@@ -25,6 +26,7 @@ import {
   clearExecution,
   clearSessionLoop,
   isExecutionApproved,
+  syncBranch,
 } from './state.ts';
 import type { CommandResponse, PlanStatus, ProtocolContext } from './types.ts';
 
@@ -76,12 +78,21 @@ export function handleCommand(
   commandArguments: string,
   context: ProtocolContext,
 ): CommandResponse {
+  const branchNotice = syncBranch(context.state, context.state.cwd);
+  if (branchNotice) context.notify('warn', branchNotice);
+
   switch (name) {
     case 'plan-status': {
       return handlePlanStatus(context);
     }
     case 'plan-attest': {
       return handlePlanAttest(commandArguments, context);
+    }
+    case 'plan-list': {
+      return handlePlanList(context);
+    }
+    case 'plan-use': {
+      return handlePlanUse(commandArguments, context);
     }
     case 'plan-close': {
       return handlePlanClose(commandArguments, context);
@@ -125,6 +136,10 @@ function handlePlanStatus(context: ProtocolContext): CommandResponse {
     `Plan path: ${status.planPath}`,
     `Scope: ${status.scope}`,
     ...(status.planId ? [`Plan ID: ${status.planId}`] : []),
+    ...(status.currentBranch
+      ? [`Current branch: ${status.currentBranch}`]
+      : []),
+    ...(status.branch ? [`Plan branch: ${status.branch}`] : []),
     `Phases: ${status.totalPhases}`,
     `Complete: ${status.completePhases}`,
     `In progress: ${status.inProgressPhases}`,

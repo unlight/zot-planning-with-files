@@ -26,8 +26,11 @@ export const DEFAULT_LOOP_PROMPT =
 export const DEFAULT_GOAL_CONDITION =
   'all phases in task_plan.md report Status: complete';
 
-export const SESSION_PLAN_AMBIGUOUS_NOTICE =
-  '[planning-with-files] Multiple plans are available while session isolation is armed. Set PLAN_ID=<slug> for this session; nothing injected.';
+export const PLAN_SELECTOR_REQUIRED_NOTICE =
+  '[planning-with-files] Multiple plans are available. Run /plan-list and /plan-use <slug>, or set PLAN_ID; nothing injected.';
+
+export const PLAN_BRANCH_MISMATCH_NOTICE =
+  '[planning-with-files] No plan is bound to the current branch. Run /plan-list and /plan-use <slug>; nothing injected.';
 
 export const INVALID_PLAN_ROOT_NOTICE =
   '[planning-with-files] PWF_PLAN_ROOT does not resolve to an existing absolute directory; nothing injected.';

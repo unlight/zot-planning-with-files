@@ -29,6 +29,14 @@ const COMMANDS: Array<{ name: string; description: string }> = [
       'manage the plan SHA-256 attestation (--show / --clear / --target)',
   },
   {
+    name: 'plan-list',
+    description: 'list plans with branch, closed state, and phase counts',
+  },
+  {
+    name: 'plan-use',
+    description: 'select a plan and bind it to the current branch',
+  },
+  {
     name: 'plan-close',
     description: 'close the active plan or reopen it with clear',
   },

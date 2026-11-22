@@ -1,18 +1,18 @@
 import { createHash } from 'node:crypto';
-import {
-  existsSync,
-  lstatSync,
-  readFileSync,
-  readdirSync,
-  realpathSync,
-  statSync,
-} from 'node:fs';
+import { existsSync, lstatSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-import type { PlanPaths, PlanStatus, SelectionError } from './types.ts';
+import { resolvePlanPaths } from './plan-select.ts';
+import type { PlanPaths, PlanStatus } from './types.ts';
 
-export const SLUG_RE = /^[A-Za-z0-9_][A-Za-z0-9._-]*$/;
-
-const ANCHOR_WALK_CAP = 10;
+export { SLUG_RE } from './plan-paths.ts';
+export { resolveAnchor } from './plan-paths.ts';
+export { resolvePlanPaths, resolvePlanPathsForTarget } from './plan-select.ts';
+export {
+  bindPlanToBranch,
+  listPlanCandidates,
+  setActivePlan,
+} from './plan-paths.ts';
+export type { PlanCandidate } from './types.ts';
 
 function safeRead(filePath: string): string {
   try {
@@ -45,33 +45,6 @@ export function normalizeWallClock(text: string): string {
     );
 }
 
-function resolveNewestPlanDirectory(planRoot: string): string | undefined {
-  if (!existsSync(planRoot)) return undefined;
-
-  const directories = readdirSync(planRoot, { withFileTypes: true })
-    .filter(
-      entry =>
-        entry.isDirectory() &&
-        !entry.name.startsWith('.') &&
-        SLUG_RE.test(entry.name),
-    )
-    .map(entry => path.join(planRoot, entry.name))
-    .filter(directory => existsSync(path.join(directory, 'task_plan.md')))
-    .map(directory => {
-      let mtime = 0;
-      try {
-        // Rank by task_plan.md mtime: editing a plan does not bump the dir mtime.
-        mtime = statSync(path.join(directory, 'task_plan.md')).mtimeMs;
-      } catch {
-        // Keep the zero default when the file disappears between checks.
-      }
-      return { directory, mtime };
-    })
-    .toSorted((a, b) => b.mtime - a.mtime);
-
-  return directories[0]?.directory;
-}
-
 function sessionIsolationState(cwd: string): 'absent' | 'armed' | 'invalid' {
   try {
     const sessions = lstatSync(path.join(cwd, '.planning', 'sessions'));
@@ -87,198 +60,6 @@ function sessionIsolationState(cwd: string): 'absent' | 'armed' | 'invalid' {
 
 function isSessionIsolationArmed(cwd: string): boolean {
   return sessionIsolationState(cwd) === 'armed';
-}
-
-function hasMultipleLivePlans(cwd: string, planRoot: string): boolean {
-  let count = existsSync(path.join(cwd, 'task_plan.md')) ? 1 : 0;
-
-  try {
-    const entries = readdirSync(planRoot, { withFileTypes: true });
-    for (const entry of entries) {
-      if (
-        !entry.isDirectory() ||
-        entry.name.startsWith('.') ||
-        !SLUG_RE.test(entry.name)
-      ) {
-        continue;
-      }
-      const candidate = path.join(planRoot, entry.name);
-      if (
-        !existsSync(path.join(candidate, 'task_plan.md')) ||
-        !isWithinRoot(cwd, candidate)
-      ) {
-        continue;
-      }
-      count += 1;
-      if (count > 1) return true;
-    }
-  } catch {
-    return true;
-  }
-
-  return false;
-}
-
-// Containment: a scoped candidate must canonicalize under the anchor.
-function isWithinRoot(root: string, candidate: string): boolean {
-  let rootReal: string;
-  let candReal: string;
-  try {
-    rootReal = realpathSync(root);
-    candReal = realpathSync(candidate);
-  } catch {
-    return false;
-  }
-  if (candReal === rootReal) return true;
-  return candReal.startsWith(
-    rootReal.endsWith(path.sep) ? rootReal : rootReal + path.sep,
-  );
-}
-
-// Walk parents until a directory carries planning state. Stop at .git or the fs root.
-export function resolveAnchor(cwd: string): string {
-  let directory = cwd;
-  for (let depth = 0; depth < ANCHOR_WALK_CAP; depth++) {
-    if (
-      existsSync(path.join(directory, '.planning')) ||
-      existsSync(path.join(directory, 'task_plan.md'))
-    ) {
-      return directory;
-    }
-    const parent = path.dirname(directory);
-    if (parent === directory || existsSync(path.join(directory, '.git'))) {
-      return cwd;
-    }
-    directory = parent;
-  }
-  return cwd;
-}
-
-function makeScoped(cwd: string, planDirectory: string): PlanPaths {
-  return {
-    cwd,
-    scope: 'scoped',
-    planDir: planDirectory,
-    planId: path.basename(planDirectory),
-    planPath: path.join(planDirectory, 'task_plan.md'),
-    progressPath: path.join(planDirectory, 'progress.md'),
-    findingsPath: path.join(planDirectory, 'findings.md'),
-    attestationCandidates: [
-      path.join(planDirectory, '.attestation'),
-      path.join(cwd, '.plan-attestation'),
-    ],
-  };
-}
-
-function makeRoot(cwd: string): PlanPaths {
-  return {
-    cwd,
-    scope: 'root',
-    planPath: path.join(cwd, 'task_plan.md'),
-    progressPath: path.join(cwd, 'progress.md'),
-    findingsPath: path.join(cwd, 'findings.md'),
-    attestationCandidates: [path.join(cwd, '.plan-attestation')],
-  };
-}
-
-function makeNone(cwd: string, selectionError?: SelectionError): PlanPaths {
-  return {
-    cwd,
-    scope: 'none',
-    selectionError,
-    attestationCandidates: [path.join(cwd, '.plan-attestation')],
-  };
-}
-
-function resolveProjectRoot(sessionCwd: string): {
-  cwd: string;
-  error?: SelectionError;
-} {
-  const pinnedRoot = process.env.PWF_PLAN_ROOT?.trim();
-  if (!pinnedRoot) return { cwd: resolveAnchor(sessionCwd) };
-
-  // An explicit root pin is a binding: refuse it rather than fall back.
-  if (!path.isAbsolute(pinnedRoot)) {
-    return { error: 'invalid-plan-root', cwd: path.resolve(sessionCwd) };
-  }
-  try {
-    if (!statSync(pinnedRoot).isDirectory()) {
-      return { error: 'invalid-plan-root', cwd: path.resolve(sessionCwd) };
-    }
-  } catch {
-    return { error: 'invalid-plan-root', cwd: path.resolve(sessionCwd) };
-  }
-  return { cwd: pinnedRoot };
-}
-
-export function resolvePlanPaths(sessionCwd: string): PlanPaths {
-  const rootResult = resolveProjectRoot(sessionCwd);
-  const cwd = rootResult.cwd;
-  if (rootResult.error) return makeNone(cwd, rootResult.error);
-
-  const planRoot = path.join(cwd, '.planning');
-
-  // A set PLAN_ID is a binding, not a hint.
-  const planId = process.env.PLAN_ID?.trim();
-  if (planId) {
-    if (SLUG_RE.test(planId)) {
-      const candidate = path.join(planRoot, planId);
-      if (
-        existsSync(path.join(candidate, 'task_plan.md')) &&
-        isWithinRoot(cwd, candidate)
-      ) {
-        return makeScoped(cwd, candidate);
-      }
-    }
-    return makeNone(cwd, 'plan-selector-rejected');
-  }
-
-  // With isolation armed, the shared pointer cannot select a plan.
-  if (isSessionIsolationArmed(cwd) && hasMultipleLivePlans(cwd, planRoot)) {
-    return makeNone(cwd, 'session-plan-ambiguous');
-  }
-
-  const activePlanFile = path.join(planRoot, '.active_plan');
-  if (existsSync(activePlanFile)) {
-    const activePlanId = safeRead(activePlanFile).trim();
-    if (activePlanId && SLUG_RE.test(activePlanId)) {
-      const candidate = path.join(planRoot, activePlanId);
-      if (
-        existsSync(path.join(candidate, 'task_plan.md')) &&
-        isWithinRoot(cwd, candidate)
-      ) {
-        return makeScoped(cwd, candidate);
-      }
-    }
-  }
-
-  const newest = resolveNewestPlanDirectory(planRoot);
-  if (newest && isWithinRoot(cwd, newest)) {
-    return makeScoped(cwd, newest);
-  }
-
-  const rootPlan = makeRoot(cwd);
-  return rootPlan.planPath && existsSync(rootPlan.planPath)
-    ? rootPlan
-    : makeNone(cwd);
-}
-
-export function resolvePlanPathsForTarget(
-  sessionCwd: string,
-  target: string,
-): PlanPaths | undefined {
-  const rootResult = resolveProjectRoot(sessionCwd);
-  if (rootResult.error) return undefined;
-  const cwd = rootResult.cwd;
-
-  if (!target || target === 'root') return makeRoot(cwd);
-  if (!SLUG_RE.test(target)) return undefined;
-
-  const candidate = path.join(cwd, '.planning', target);
-  return existsSync(path.join(candidate, 'task_plan.md')) &&
-    isWithinRoot(cwd, candidate)
-    ? makeScoped(cwd, candidate)
-    : undefined;
 }
 
 export function readPlanStatus(
