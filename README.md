@@ -2,7 +2,8 @@
 
 A zot extension for the `planning-with-files` workflow. It keeps the
 three-file workflow (`task_plan.md`, `findings.md`, `progress.md`) on disk and
-adds plan status, attestation, execution approval, goal, and loop commands.
+adds plan status, attestation, execution approval, goal, and loop commands. A
+trimmed zot-specific skill is bundled with the extension.
 
 - Repository: <https://github.com/unlight/zot-planning-with-files>
 - Upstream project: <https://github.com/OthmanAdi/planning-with-files>
@@ -29,21 +30,17 @@ adds plan status, attestation, execution approval, goal, and loop commands.
    zot --ext /path/to/zot-planning-with-files
    ```
 
-2. Install the upstream skill separately. The extension does not bundle it:
-
-   ```bash
-   npx skills add OthmanAdi/planning-with-files --skill planning-with-files -g
-   ```
-
-   Then invoke it in zot:
+2. The extension bundles the zot-specific skill
+   `planning-with-files:planning`. No separate skill install is required. `/pwf`
+   loads it automatically. For manual invocation:
 
    ```text
-   /skill:planning-with-files
+   /skill:planning-with-files:planning
    ```
 
-   If you prefer manual files, create `task_plan.md`, `findings.md`, and
-   `progress.md` in the project root or in `.planning/<slug>/` using the
-   upstream templates.
+   If an older upstream `planning-with-files` skill is still installed, remove
+   it to avoid two conflicting instruction sets. The bundled skill includes the
+   three file templates.
 
 3. Inspect the selected plan:
 
@@ -68,9 +65,9 @@ injected into model context. Review and edit the plan before approving it.
 
 ## Typical workflow
 
-A small feature is enough to show the full loop. This assumes the upstream
-skill is installed as shown in Quick start. The example uses a project-root
-plan; parallel tasks can keep the same three files under `.planning/<slug>/`.
+A small feature is enough to show the full loop. The extension supplies the
+bundled skill and hooks. The example uses a project-root plan; parallel tasks
+can keep the same three files under `.planning/<slug>/`.
 
 ### 1. Start the plan
 
@@ -78,8 +75,8 @@ plan; parallel tasks can keep the same three files under `.planning/<slug>/`.
 /pwf Build a Python CLI todo app with add, list, and delete commands.
 ```
 
-The extension loads the upstream `planning-with-files` skill and passes the
-task to it. The model creates:
+The extension loads the bundled `planning-with-files:planning` skill and passes
+the task to it. The model creates:
 
 ```text
 task_plan.md
@@ -200,7 +197,7 @@ and the
 
 | Command                             | Arguments           | Behavior                                                                                                                               |
 | ----------------------------------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `/pwf [task]`                       | optional task       | Load the upstream `planning-with-files` skill and start the workflow.                                                                  |
+| `/pwf [task]`                       | optional task       | Load the bundled `planning-with-files:planning` skill and start the workflow.                                                          |
 | `/pwf-status`                       | none                | Show a compact status block: plan, scope, mode, attestation, current phase, and phase counts.                                          |
 | `/plan-status`                      | none                | Show the selected plan path, scope, plan ID, phase counts, attestation state, and execution state.                                     |
 | `/plan-status <slug>`               | plan slug or `root` | Show one plan read-only without changing `.active_plan` or execution approval.                                                         |
@@ -426,24 +423,34 @@ The extension also:
 - reports all phases complete once per session and suggests `/plan-close`;
 - clears execution approval on session start and session end.
 
-## Upstream skill
+## Bundled skill
 
-The extension does not bundle the `planning-with-files` skill. Install it
-separately so the model has the three-file workflow instructions. `/pwf` loads
-this skill through zot's `tool_prompt` action:
-
-```bash
-npx skills add OthmanAdi/planning-with-files --skill planning-with-files -g
-```
-
-Invoke it in zot with:
+The extension bundles a trimmed zot-specific skill derived from
+[upstream planning-with-files](https://github.com/OthmanAdi/planning-with-files):
 
 ```text
-/skill:planning-with-files
+skills/planning-with-files/SKILL.md
+skills/planning-with-files/templates/task_plan.md
+skills/planning-with-files/templates/findings.md
+skills/planning-with-files/templates/progress.md
+skills/planning-with-files/LICENSE
 ```
 
-The extension supplies the commands and lifecycle hooks. The skill supplies the
-workflow and templates.
+zot namespaces extension skills, so the canonical name is
+`planning-with-files:planning`. `/pwf` loads it through the `skill` tool:
+
+```text
+/skill:planning-with-files:planning
+```
+
+The bundled skill covers the three files, phase format, budgets, branch-aware
+selection, close marker, and archive behavior. It intentionally omits the
+upstream Claude Code hooks and utility scripts. Upstream is MIT licensed; the
+notice is kept in `skills/planning-with-files/LICENSE`.
+
+If the external upstream skill is also installed, zot sees two separate names:
+`planning-with-files` and `planning-with-files:planning`. Remove the external
+one unless you explicitly want both instruction sets.
 
 ## Project layout
 
@@ -466,6 +473,9 @@ src/lib/state.ts                        per-session state
 src/lib/commands.ts                     command handlers
 src/lib/hooks.ts                        events and before_agent_start
 src/lib/pwf.ts                          /pwf and /pwf-status handlers
+skills/planning-with-files/SKILL.md     bundled zot planning skill
+skills/planning-with-files/templates/   plan, findings, and progress templates
+skills/planning-with-files/LICENSE      upstream MIT notice
 test/extension.test.ts                  stdio protocol tests
 tsconfig.json                           type-checking config
 .github/workflows/ci.yml                lint, format, test, bundle check, release

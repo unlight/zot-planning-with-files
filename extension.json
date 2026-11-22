@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "exec": "./dist/index.js",
   "language": "typescript",
+  "skills": ["./skills"],
   "description": "planning-with-files workflow for zot: branch-aware plan list and selection, status, attestation, execution approval, close, goal, and loop commands",
   "enabled": true
 }

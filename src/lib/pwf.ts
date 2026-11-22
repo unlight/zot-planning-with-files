@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { checkPlanAttestation } from './attestation.ts';
+import { PLANNING_SKILL_NAME } from './constants.ts';
 import { readPlanStatus } from './plan.ts';
 import {
   deriveEffectiveMode,
@@ -19,7 +20,7 @@ export function handlePwf(commandArguments: string): CommandResponse {
     action: 'tool_prompt',
     prompt: task,
     tool_name: 'skill',
-    tool_args: { name: 'planning-with-files' },
+    tool_args: { name: PLANNING_SKILL_NAME },
   };
 }
 

@@ -10,6 +10,7 @@ var extension_default = {
 	version: "1.0.0",
 	exec: "./dist/index.js",
 	language: "typescript",
+	skills: ["./skills"],
 	description: "planning-with-files workflow for zot: branch-aware plan list and selection, status, attestation, execution approval, close, goal, and loop commands",
 	enabled: true
 };
@@ -550,6 +551,7 @@ function syncBranch(state, cwd) {
 	return `[planning-with-files] Branch changed: ${previous} -> ${branch}. Execution approval cleared. Run /plan-execute for the current plan.`;
 }
 // src/lib/constants.ts
+const PLANNING_SKILL_NAME = "planning-with-files:planning";
 const PLAN_DATA_BEGIN = "===BEGIN PLAN DATA===";
 const PLAN_DATA_END = "===END PLAN DATA===";
 const PLAN_CLOSED_MARKER = "<!-- pwf: closed -->";
@@ -863,7 +865,7 @@ function handlePwf(commandArguments) {
 		action: "tool_prompt",
 		prompt: commandArguments.trim() || "Start the planning-with-files workflow for this project.",
 		tool_name: "skill",
-		tool_args: { name: "planning-with-files" }
+		tool_args: { name: PLANNING_SKILL_NAME }
 	};
 }
 function currentPhaseName(status) {

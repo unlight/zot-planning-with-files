@@ -336,6 +336,33 @@ test('logs plan selection and notifications', async t => {
   assert.match(session.stderr(), /notify info startup:/);
 });
 
+test('bundles the zot planning skill', () => {
+  const manifest = JSON.parse(
+    readFileSync(join(EXT_DIR, 'extension.json'), 'utf8'),
+  ) as { skills?: string[] };
+  assert.deepEqual(manifest.skills, ['./skills']);
+  for (const file of [
+    'SKILL.md',
+    'LICENSE',
+    'templates/task_plan.md',
+    'templates/findings.md',
+    'templates/progress.md',
+  ]) {
+    assert.ok(
+      existsSync(join(EXT_DIR, 'skills', 'planning-with-files', file)),
+      file,
+    );
+  }
+  const skill = readFileSync(
+    join(EXT_DIR, 'skills', 'planning-with-files', 'SKILL.md'),
+    'utf8',
+  );
+  assert.match(skill, /name: planning/);
+  assert.match(skill, /\/plan-close/);
+  assert.match(skill, /\.branch/);
+  assert.match(skill, /progress\.md/);
+});
+
 test('pwf aliases start the workflow and show status', async t => {
   const project = createProject();
   t.after(() => rmSync(project, { recursive: true, force: true }));
@@ -345,7 +372,9 @@ test('pwf aliases start the workflow and show status', async t => {
   const started = await session.command('pwf', 'ship the feature');
   assert.equal(started.action, 'tool_prompt');
   assert.equal(started.tool_name, 'skill');
-  assert.deepEqual(started.tool_args, { name: 'planning-with-files' });
+  assert.deepEqual(started.tool_args, {
+    name: 'planning-with-files:planning',
+  });
   assert.equal(started.prompt, 'ship the feature');
 
   const defaultStart = await session.command('pwf');
