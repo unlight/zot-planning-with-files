@@ -6,7 +6,7 @@ import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSy
 import path from "node:path";
 // extension.json
 var extension_default = {
-	name: "planning-with-files",
+	name: "pwf",
 	version: "1.0.0",
 	exec: "./dist/index.js",
 	language: "typescript",
@@ -551,7 +551,7 @@ function syncBranch(state, cwd) {
 	return `[planning-with-files] Branch changed: ${previous} -> ${branch}. Execution approval cleared. Run /plan-execute for the current plan.`;
 }
 // src/lib/constants.ts
-const PLANNING_SKILL_NAME = "planning-with-files:pwf";
+const PLANNING_SKILL_NAME = "pwf:planning";
 const PLAN_DATA_BEGIN = "===BEGIN PLAN DATA===";
 const PLAN_DATA_END = "===END PLAN DATA===";
 const PLAN_CLOSED_MARKER = "<!-- pwf: closed -->";

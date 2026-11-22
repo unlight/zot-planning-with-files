@@ -31,11 +31,11 @@ trimmed zot-specific skill is bundled with the extension.
    ```
 
 2. The extension bundles the zot-specific skill
-   `planning-with-files:pwf`. No separate skill install is required. `/pwf`
+   `pwf:planning`. No separate skill install is required. `/pwf`
    loads it automatically. For manual invocation:
 
    ```text
-   /skill:planning-with-files:pwf
+   /skill:pwf:planning
    ```
 
    If an older upstream `planning-with-files` skill is still installed, remove
@@ -75,7 +75,7 @@ can keep the same three files under `.planning/<slug>/`.
 /pwf Build a Python CLI todo app with add, list, and delete commands.
 ```
 
-The extension loads the bundled `planning-with-files:pwf` skill and passes
+The extension loads the bundled `pwf:planning` skill and passes
 the task to it. The model creates:
 
 ```text
@@ -197,7 +197,7 @@ and the
 
 | Command                             | Arguments           | Behavior                                                                                                                               |
 | ----------------------------------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `/pwf [task]`                       | optional task       | Load the bundled `planning-with-files:pwf` skill and start the workflow.                                                               |
+| `/pwf [task]`                       | optional task       | Load the bundled `pwf:planning` skill and start the workflow.                                                                          |
 | `/pwf-status`                       | none                | Show a compact status block: plan, scope, mode, attestation, current phase, and phase counts.                                          |
 | `/plan-status`                      | none                | Show the selected plan path, scope, plan ID, phase counts, attestation state, and execution state.                                     |
 | `/plan-status <slug>`               | plan slug or `root` | Show one plan read-only without changing `.active_plan` or execution approval.                                                         |
@@ -437,10 +437,10 @@ skills/planning-with-files/LICENSE
 ```
 
 zot namespaces extension skills, so the canonical name is
-`planning-with-files:pwf`. `/pwf` loads it through the `skill` tool:
+`pwf:planning`. `/pwf` loads it through the `skill` tool:
 
 ```text
-/skill:planning-with-files:pwf
+/skill:pwf:planning
 ```
 
 The bundled skill covers the three files, phase format, budgets, branch-aware
@@ -449,7 +449,7 @@ upstream Claude Code hooks and utility scripts. Upstream is MIT licensed; the
 notice is kept in `skills/planning-with-files/LICENSE`.
 
 If the external upstream skill is also installed, zot sees two separate names:
-`planning-with-files` and `planning-with-files:pwf`. Remove the external
+`planning-with-files` and `pwf:planning`. Remove the external
 one unless you explicitly want both instruction sets.
 
 ## Project layout

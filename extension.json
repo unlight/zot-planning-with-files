@@ -1,5 +1,5 @@
 {
-  "name": "planning-with-files",
+  "name": "pwf",
   "version": "1.0.0",
   "exec": "./dist/index.js",
   "language": "typescript",

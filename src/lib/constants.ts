@@ -1,5 +1,5 @@
 export const PKG_NAME = 'planning-with-files';
-export const PLANNING_SKILL_NAME = 'planning-with-files:pwf';
+export const PLANNING_SKILL_NAME = 'pwf:planning';
 export const PLAN_DATA_BEGIN = '===BEGIN PLAN DATA===';
 export const PLAN_DATA_END = '===END PLAN DATA===';
 export const PLAN_CLOSED_MARKER = '<!-- pwf: closed -->';
