@@ -3,10 +3,12 @@ import path from 'node:path';
 import { readCurrentBranch } from './branch.ts';
 import {
   SLUG_RE,
+  archiveSelectionDetail,
   bindPlanToBranch,
   branchMismatchDetail,
   describeCandidates,
   isWithinRoot,
+  listArchivedCandidatesAt,
   listPlanCandidatesAt,
   makeNone,
   makeRoot,
@@ -76,6 +78,16 @@ export function resolvePlanPaths(sessionCwd: string): PlanPaths {
   const activeCandidate = activeId
     ? candidates.find(candidate => candidate.slug === activeId)
     : undefined;
+
+  const archived = listArchivedCandidatesAt(cwd);
+  if (!activeCandidate && archived.length > 0) {
+    const detail = archiveSelectionDetail(candidates, archived);
+    const paths = makeNone(cwd, 'plan-selector-required', detail);
+    return mark(
+      withCurrentBranch(paths, currentBranch),
+      'archived-selection-required',
+    );
+  }
 
   if (candidates.length === 1) {
     const only = candidates[0];

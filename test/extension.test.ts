@@ -1047,6 +1047,45 @@ test('refuses a plan bound to another branch', async t => {
   assert.match(warning.message ?? '', /other \(branch: feature\/b\)/);
 });
 
+test('archived plans require explicit selection', async t => {
+  const project = createProject({ withPlan: false });
+  t.after(() => rmSync(project, { recursive: true, force: true }));
+  mkdirSync(join(project, '.planning', 'alpha'), { recursive: true });
+  mkdirSync(join(project, '.planning', '.archive', 'old'), { recursive: true });
+  writeFileSync(join(project, '.planning', 'alpha', 'task_plan.md'), PLAN);
+  writeFileSync(
+    join(project, '.planning', '.archive', 'old', 'task_plan.md'),
+    PLAN,
+  );
+
+  const session = await startExtension(project);
+  t.after(() => session.close());
+
+  const blocked = await session.command('plan-status');
+  assert.equal(blocked.action, 'noop');
+  const warning = await session.frames.next(
+    frame =>
+      frame.type === 'notify' &&
+      typeof frame.message === 'string' &&
+      frame.message.includes('Archived plans exist'),
+  );
+  assert.match(warning.message ?? '', /old \(archived\)/);
+
+  const list = await session.command('plan-list');
+  assert.match(list.display ?? '', /old\tunbound\t.*\tarchived/);
+  assert.match(list.display ?? '', /alpha\tunbound\t.*\tlive/);
+
+  await session.command('plan-use', 'alpha');
+  await session.frames.next(
+    frame =>
+      frame.type === 'notify' &&
+      typeof frame.message === 'string' &&
+      frame.message.includes('Plan selected: alpha'),
+  );
+  const selected = await session.command('plan-status');
+  assert.match(selected.display ?? '', /\.planning\/alpha\/task_plan\.md/);
+});
+
 test('binds a single unbound plan to the current branch', async t => {
   const project = createProject({ withPlan: false });
   t.after(() => rmSync(project, { recursive: true, force: true }));

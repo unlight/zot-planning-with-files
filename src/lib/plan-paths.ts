@@ -203,12 +203,48 @@ export function listPlanCandidatesAt(cwd: string): PlanCandidate[] {
   return candidates.toSorted((a, b) => b.mtimeMs - a.mtimeMs);
 }
 
+export function listArchivedCandidatesAt(cwd: string): PlanCandidate[] {
+  const archiveRoot = path.join(cwd, '.planning', '.archive');
+  const candidates: PlanCandidate[] = [];
+  try {
+    const entries = readdirSync(archiveRoot, { withFileTypes: true });
+    for (const entry of entries) {
+      if (
+        !entry.isDirectory() ||
+        entry.name.startsWith('.') ||
+        !SLUG_RE.test(entry.name)
+      ) {
+        continue;
+      }
+      const directory = path.join(archiveRoot, entry.name);
+      const planPath = path.join(directory, 'task_plan.md');
+      if (!existsSync(planPath) || !isWithinRoot(cwd, directory)) continue;
+      const paths = makeScoped(cwd, directory);
+      candidates.push({
+        slug: entry.name,
+        paths,
+        branch: paths.branch,
+        mtimeMs: planMtime(planPath),
+        archived: true,
+      });
+    }
+  } catch {
+    // Missing archive is normal; other read failures yield no archived plans.
+  }
+  return candidates.toSorted((a, b) => b.mtimeMs - a.mtimeMs);
+}
+
 export function listPlanCandidates(sessionCwd: string): PlanCandidate[] {
   const rootResult = resolveProjectRoot(sessionCwd);
-  return rootResult.error ? [] : listPlanCandidatesAt(rootResult.cwd);
+  if (rootResult.error) return [];
+  return [
+    ...listPlanCandidatesAt(rootResult.cwd),
+    ...listArchivedCandidatesAt(rootResult.cwd),
+  ];
 }
 
 function candidateLine(candidate: PlanCandidate): string {
+  if (candidate.archived) return `- ${candidate.slug} (archived)`;
   return `- ${candidate.slug}${candidate.branch ? ` (branch: ${candidate.branch})` : ' (unbound)'}`;
 }
 
@@ -222,6 +258,17 @@ export function describeCandidates(
   return [
     `${heading} Run /plan-list and /plan-use <slug>, or set PLAN_ID; nothing injected.`,
     ...candidates.map(candidate => candidateLine(candidate)),
+  ].join('\n');
+}
+
+export function archiveSelectionDetail(
+  live: PlanCandidate[],
+  archived: PlanCandidate[],
+): string {
+  return [
+    '[planning-with-files] Archived plans exist and .active_plan is missing. Run /plan-list and /plan-use <slug>; nothing injected.',
+    ...live.map(candidate => candidateLine(candidate)),
+    ...archived.map(candidate => candidateLine(candidate)),
   ].join('\n');
 }
 

@@ -196,15 +196,46 @@ function listPlanCandidatesAt(cwd) {
 	} catch {}
 	return candidates.toSorted((a, b) => b.mtimeMs - a.mtimeMs);
 }
+function listArchivedCandidatesAt(cwd) {
+	const archiveRoot = path.join(cwd, ".planning", ".archive");
+	const candidates = [];
+	try {
+		const entries = readdirSync(archiveRoot, { withFileTypes: true });
+		for (const entry of entries) {
+			if (!entry.isDirectory() || entry.name.startsWith(".") || !SLUG_RE.test(entry.name)) continue;
+			const directory = path.join(archiveRoot, entry.name);
+			const planPath = path.join(directory, "task_plan.md");
+			if (!existsSync(planPath) || !isWithinRoot(cwd, directory)) continue;
+			const paths = makeScoped(cwd, directory);
+			candidates.push({
+				slug: entry.name,
+				paths,
+				branch: paths.branch,
+				mtimeMs: planMtime(planPath),
+				archived: true
+			});
+		}
+	} catch {}
+	return candidates.toSorted((a, b) => b.mtimeMs - a.mtimeMs);
+}
 function listPlanCandidates(sessionCwd) {
 	const rootResult = resolveProjectRoot(sessionCwd);
-	return rootResult.error ? [] : listPlanCandidatesAt(rootResult.cwd);
+	if (rootResult.error) return [];
+	return [...listPlanCandidatesAt(rootResult.cwd), ...listArchivedCandidatesAt(rootResult.cwd)];
 }
 function candidateLine(candidate) {
+	if (candidate.archived) return `- ${candidate.slug} (archived)`;
 	return `- ${candidate.slug}${candidate.branch ? ` (branch: ${candidate.branch})` : " (unbound)"}`;
 }
 function describeCandidates(candidates, branch) {
 	return [`${branch ? `[planning-with-files] Multiple plans are available for branch ${branch}.` : "[planning-with-files] Multiple plans are available."} Run /plan-list and /plan-use <slug>, or set PLAN_ID; nothing injected.`, ...candidates.map((candidate) => candidateLine(candidate))].join("\n");
+}
+function archiveSelectionDetail(live, archived) {
+	return [
+		"[planning-with-files] Archived plans exist and .active_plan is missing. Run /plan-list and /plan-use <slug>; nothing injected.",
+		...live.map((candidate) => candidateLine(candidate)),
+		...archived.map((candidate) => candidateLine(candidate))
+	].join("\n");
 }
 function branchMismatchDetail(candidates, branch) {
 	return [`[planning-with-files] No plan is bound to branch ${branch}. Run /plan-list and /plan-use <slug>; nothing injected.`, ...candidates.map((candidate) => candidateLine(candidate))].join("\n");
@@ -242,6 +273,8 @@ function resolvePlanPaths(sessionCwd) {
 	if (candidates.length === 0) return mark(withCurrentBranch(makeNone(cwd), currentBranch), "no-plan");
 	const activeId = readActivePlanId(cwd);
 	const activeCandidate = activeId ? candidates.find((candidate) => candidate.slug === activeId) : void 0;
+	const archived = listArchivedCandidatesAt(cwd);
+	if (!activeCandidate && archived.length > 0) return mark(withCurrentBranch(makeNone(cwd, "plan-selector-required", archiveSelectionDetail(candidates, archived)), currentBranch), "archived-selection-required");
 	if (candidates.length === 1) {
 		const only = candidates[0];
 		if (!only) return mark(withCurrentBranch(makeNone(cwd), currentBranch), "none");
@@ -470,12 +503,12 @@ function handlePlanList(context) {
 	const lines = [
 		`Current branch: ${branch ?? "none"}`,
 		"",
-		"slug	branch	closed	phases	mtime"
+		"slug	branch	closed	phases	mtime	state"
 	];
 	for (const candidate of candidates) {
 		const status = readPlanStatus(context.state.cwd, candidate.paths);
-		const marker = branch && candidate.branch === branch ? "*" : " ";
-		lines.push(`${marker}${candidate.slug}\t${candidate.branch ?? "unbound"}\t${status.isClosed ? "yes" : "no"}\t${status.completePhases}/${status.totalPhases}\t${new Date(candidate.mtimeMs).toISOString()}`);
+		const marker = branch && !candidate.archived && candidate.branch === branch ? "*" : " ";
+		lines.push(`${marker}${candidate.slug}\t${candidate.branch ?? "unbound"}\t${status.isClosed ? "yes" : "no"}\t${status.completePhases}/${status.totalPhases}\t${new Date(candidate.mtimeMs).toISOString()}\t${candidate.archived ? "archived" : "live"}`);
 	}
 	lines.push("", "* = current branch");
 	return {

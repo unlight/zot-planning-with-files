@@ -27,13 +27,14 @@ export function handlePlanList(context: ProtocolContext): CommandResponse {
   const lines = [
     `Current branch: ${branch ?? 'none'}`,
     '',
-    'slug\tbranch\tclosed\tphases\tmtime',
+    'slug\tbranch\tclosed\tphases\tmtime\tstate',
   ];
   for (const candidate of candidates) {
     const status = readPlanStatus(context.state.cwd, candidate.paths);
-    const marker = branch && candidate.branch === branch ? '*' : ' ';
+    const marker =
+      branch && !candidate.archived && candidate.branch === branch ? '*' : ' ';
     lines.push(
-      `${marker}${candidate.slug}\t${candidate.branch ?? 'unbound'}\t${status.isClosed ? 'yes' : 'no'}\t${status.completePhases}/${status.totalPhases}\t${new Date(candidate.mtimeMs).toISOString()}`,
+      `${marker}${candidate.slug}\t${candidate.branch ?? 'unbound'}\t${status.isClosed ? 'yes' : 'no'}\t${status.completePhases}/${status.totalPhases}\t${new Date(candidate.mtimeMs).toISOString()}\t${candidate.archived ? 'archived' : 'live'}`,
     );
   }
   lines.push('', '* = current branch');
