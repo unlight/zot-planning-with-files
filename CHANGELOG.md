@@ -1,3 +1,21 @@
+## [1.2.0](https://github.com/unlight/zot-planning-with-files/compare/v1.1.0...v1.2.0) (2026-11-22)
+
+### Features
+
+* Add branch-aware plan selection ([d45d856](https://github.com/unlight/zot-planning-with-files/commit/d45d8563c1e284df4a4da9764b455f2a3041b0e6))
+* Add read-only plan status target ([21d78de](https://github.com/unlight/zot-planning-with-files/commit/21d78de2447b2078dd836f14aee37aa7615eee5b))
+* Bundle the zot planning skill ([3989483](https://github.com/unlight/zot-planning-with-files/commit/39894835e45795cb15dfeb9707e2d17f12257149))
+* Detect archived plans during selection ([4cdd345](https://github.com/unlight/zot-planning-with-files/commit/4cdd3453631362125d0ff891a2c8bb5c33f4ba46))
+* Guard and atomically close plans ([350b79d](https://github.com/unlight/zot-planning-with-files/commit/350b79d374f13574541737bee5708168e4638ac1))
+* Log plan selection and notifications ([62f5938](https://github.com/unlight/zot-planning-with-files/commit/62f59382fa7210f9ccb7c48126090fc0fc83d025))
+* Make completed plans explicit and quiet ([c959fbd](https://github.com/unlight/zot-planning-with-files/commit/c959fbd1f29dfae43ac12956c966283887e9a685))
+
+### Bug Fixes
+
+* Preserve plan mode on atomic close ([3e4c0ae](https://github.com/unlight/zot-planning-with-files/commit/3e4c0ae2c923730df17ec2f842ab9df0a092a6ec))
+* Remove noisy dangerous-command warning ([67647ac](https://github.com/unlight/zot-planning-with-files/commit/67647ac32b916aef707cea5b1a2e1439f9ec3e89))
+* Treat unreadable plans as missing ([2e71b84](https://github.com/unlight/zot-planning-with-files/commit/2e71b847de18fb84dba4c781fbd25bb4299ecd79))
+
 ## [1.1.0](https://github.com/unlight/zot-planning-with-files/compare/v1.0.0...v1.1.0) (2026-11-16)
 
 ### Features
