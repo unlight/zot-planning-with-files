@@ -203,14 +203,17 @@ and the
 | `/pwf [task]`                       | optional task       | Load the upstream `planning-with-files` skill and start the workflow.                                                                  |
 | `/pwf-status`                       | none                | Show a compact status block: plan, scope, mode, attestation, current phase, and phase counts.                                          |
 | `/plan-status`                      | none                | Show the selected plan path, scope, plan ID, phase counts, attestation state, and execution state.                                     |
+| `/plan-status <slug>`               | plan slug or `root` | Show one plan read-only without changing `.active_plan` or execution approval.                                                         |
+| `/plan-status --target <slug>`      | plan slug or `root` | Same as `/plan-status <slug>`.                                                                                                         |
 | `/plan-attest`                      | none                | Record the SHA-256 of `task_plan.md` in `.planning/<id>/.attestation` or `./.plan-attestation`.                                        |
 | `/plan-attest --show`               | none                | Print the stored hash, the current hash, and whether they match.                                                                       |
 | `/plan-attest --clear`              | none                | Remove the attestation and reopen the plan for editing.                                                                                |
 | `/plan-attest --target root`        | none                | Attest the legacy root `task_plan.md` explicitly.                                                                                      |
 | `/plan-attest --target <plan-id>`   | plan ID             | Attest one named plan explicitly.                                                                                                      |
-| `/plan-list`                        | none                | List plans with branch, closed state, phase counts, and modification time.                                                             |
+| `/plan-list`                        | none                | List live and archived plans with branch, closed state, phase counts, modification time, and state.                                    |
 | `/plan-use <slug>`                  | plan slug           | Select a plan, bind it to the current branch, write `.active_plan`, and clear execution approval. Use `root` for the legacy root plan. |
-| `/plan-close`                       | none                | Append `<!-- pwf: closed -->`, clear execution approval, and stop auto-continue.                                                       |
+| `/plan-close`                       | none                | Close a completed plan: append `<!-- pwf: closed -->`, clear approval, stop auto-continue.                                             |
+| `/plan-close --force`               | none                | Close an incomplete plan. Without it, an incomplete plan is refused.                                                                   |
 | `/plan-close clear`                 | none                | Remove the closed marker and reopen the plan for attestation and execution.                                                            |
 | `/plan-execute`                     | none                | Approve the selected plan for this session and activate hooks. Refuses a tampered plan.                                                |
 | `/plan-execute reset`               | none                | Return the selected plan to passive review mode.                                                                                       |
@@ -252,12 +255,18 @@ Selection order:
    `/plan-use <slug>`.
 8. If no plan matches the branch, refuse. Plans bound to other branches are
    never injected.
-9. The legacy project-root `task_plan.md` is a candidate like any other plan,
-   with its branch stored in `./.plan-branch`.
+9. Plans under `.planning/.archive/<slug>/` are listed by `/plan-list` but are
+   never selected. If archived plans exist and `.active_plan` is missing, the
+   extension refuses selection until `/plan-use <slug>` writes a pointer.
+10. The legacy project-root `task_plan.md` is a candidate like any other plan,
+    with its branch stored in `./.plan-branch`.
 
 The extension no longer chooses the newest plan by mtime when more than one plan
 is available. That fallback caused plans, `progress.md`, and `findings.md` from
 one branch to be injected into another branch.
+
+`/plan-list` includes a `state` column with `live` or `archived`. Archived plans
+are visible for reference but never injected.
 
 A plan can be bound to a branch explicitly:
 
@@ -378,6 +387,16 @@ It also clears execution approval for every session and stops auto-continue.
 Because the marker changes the plan bytes, the command clears the attestation as
 well. Reopen the plan with `/plan-close clear`, then run `/plan-attest` and
 `/plan-execute` again.
+
+An incomplete plan is refused. Use `/plan-close --force` to close it anyway:
+
+```text
+[plan-close] Plan is incomplete (4/7).
+Run /plan-close --force to close it anyway.
+```
+
+The plan write uses a temporary file and rename, so an interrupted close does
+not leave a partially written `task_plan.md`.
 
 When the last phase becomes `complete`, the extension stops auto-continue and
 reports `ALL PHASES COMPLETE` once per session. Run `/plan-close` to stop
@@ -543,6 +562,12 @@ does not choose by mtime.
 The only plans on disk belong to other branches. Run `/plan-list` to see them.
 Use `/plan-use <slug>` to rebind one to the current branch, or create a new plan.
 
+**`Archived plans exist and .active_plan is missing`**
+
+Upstream `set-active-plan.sh --archive` removes `.active_plan`. Run `/plan-list`,
+then `/plan-use <slug>` to choose a live plan. The extension will not fall back
+to another live plan on its own.
+
 **`Branch changed: <old> -> <new>`**
 
 The branch changed during the session. Execution approval, auto-continue, and
@@ -572,6 +597,19 @@ Check that `/plan-execute` was run in this session, that the mode is not
 
 zot ignores the `submit` frame outside the interactive TUI. Use the interactive
 TUI for auto-continue and planning loops.
+
+## Logging
+
+Plan selection and sent notifications are written to the extension log without
+`PWF_DEBUG`:
+
+```text
+[planning-with-files] selection scope=scoped plan=sposs-22191 rule=single-branch branch=feature/a
+[planning-with-files] notify info startup: 5/5 phases complete - run /plan-close when the task is done
+```
+
+`PWF_DEBUG=1` adds detailed injection messages. Selection logs are deduplicated
+until the plan, rule, or branch changes.
 
 ## Security
 
